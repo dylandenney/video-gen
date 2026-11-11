@@ -10,9 +10,11 @@
 - [x] Storyboard transitions (cut, crossfade, flash, fade to black)
 - [x] Cuts on sung phrases
 - [x] Job delete, dates in job list
+- [x] Storyboard rule: only physically filmable shots
 - [ ] ComfyUI as a systemd service (needs sudo once)
 - [ ] Export presets per platform; burned-in lyric captions
 - [ ] AI upscaling to 1080x1920
+- [x] Vision quality check on keyframes with automatic retakes
 
 ## M5 — bigger features (in order)
 1. **Lip sync** — Wan 2.2 S2V 14B on scenes the storyboard marks as singing on camera, driven by isolated vocals for that span.
