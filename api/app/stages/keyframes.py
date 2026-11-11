@@ -54,6 +54,13 @@ def check(path: Path) -> list[str]:
     return [k for k, bad in result.items() if bad]
 
 
+def sheet_graph(name: str, appearance: str, seed: int) -> dict:
+    """Workflow for a character reference sheet; also used by the character library."""
+    return comfy.fill("qwen_image_t2i", width=W, height=H, seed=seed, negative=NEGATIVE, prompt=(
+        f"Character reference photo of {name}: {appearance}. Full body, standing, facing the camera, "
+        f"neutral expression, plain light grey studio background, soft even light, photorealistic, sharp focus."))
+
+
 def render_scene(d: Path, board: dict, s: dict) -> None:
     """Draw one scene's keyframe (keyframes/NN.png), retrying with new seeds while the quality check finds defects."""
     path = d / "keyframes" / f'{s["index"]:02d}.png'
@@ -99,9 +106,7 @@ def run(d: Path, job: dict) -> None:
             if "photo" in c:  # cast from the user's photo: use it as-is
                 shutil.copyfile(d / "cast" / c["photo"], path)
                 continue
-            comfy.run(comfy.fill("qwen_image_t2i", width=W, height=H, seed=seed + 1000 + i, negative=NEGATIVE, prompt=(
-                f"Character reference photo of {c['name']}: {c['appearance']}. Full body, standing, facing the camera, "
-                f"neutral expression, plain light grey studio background, soft even light, photorealistic, sharp focus.")), path)
+            comfy.run(sheet_graph(c["name"], c["appearance"], seed + 1000 + i), path)
         # Scenes without characters first, so ComfyUI switches between the two image models only once.
         for s in sorted(board["scenes"], key=lambda s: bool(s["characters"])):
             render_scene(d, board, s)

@@ -2,6 +2,7 @@ import logging
 import shutil
 import subprocess
 import uuid
+from pathlib import Path
 from typing import Literal
 
 import httpx
@@ -10,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import export, jobs
+from . import characters, export, jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
 from .stages.analyze import ffmpeg, song_overview
@@ -210,29 +211,55 @@ def image(job_id: str, folder: str, name: str):
     return FileResponse(path)
 
 
-@app.post("/api/jobs/{job_id}/cast")
-async def add_cast(job_id: str, file: UploadFile, name: str = Form(...)) -> dict:
-    """Add a photo of a real person to cast as a character (stays on this machine)."""
-    job = get_job(job_id)
-    cast = job.get("cast", [])
-    if len(cast) >= 3:
-        raise HTTPException(400, "up to 3 cast photos")
-    n = max((int(c["id"].split("_")[1]) for c in cast), default=0) + 1
-    folder = jobs.job_dir(job_id) / "cast"
-    folder.mkdir(exist_ok=True)
-    raw = folder / f"upload_{n}"
-    photo = f"cast_{n}_{uuid.uuid4().hex[:8]}.png"  # unique name so browsers never show a removed photo
-    raw.write_bytes(await file.read())
+def to_png(data: bytes, folder: Path, name: str) -> Path:
+    """Save an uploaded photo as PNG, at most 1536 px on the long side."""
+    folder.mkdir(parents=True, exist_ok=True)
+    raw = folder / f"upload_{uuid.uuid4().hex[:8]}"
+    raw.write_bytes(data)
     try:
-        # Normalize to PNG, at most 1536 px on the long side.
         ffmpeg("-i", str(raw), "-vf", "scale=w='min(1536,iw)':h='min(1536,ih)':force_original_aspect_ratio=decrease",
-               "-frames:v", "1", str(folder / photo))
+               "-frames:v", "1", str(folder / name))
     except subprocess.CalledProcessError:
         raise HTTPException(400, "could not read that image")
     finally:
         raw.unlink()
+    return folder / name
+
+
+def add_to_cast(job_id: str, name: str, make_photo, appearance: str | None = None) -> dict:
+    """Append a cast entry; make_photo(folder, filename) writes its PNG into the job's cast folder."""
+    job = get_job(job_id)
+    cast = job.get("cast", [])
+    if len(cast) >= 3:
+        raise HTTPException(400, "up to 3 cast members")
+    n = max((int(c["id"].split("_")[1]) for c in cast), default=0) + 1
+    photo = f"cast_{n}_{uuid.uuid4().hex[:8]}.png"  # unique name so browsers never show a removed photo
+    make_photo(jobs.job_dir(job_id) / "cast", photo)
     entry = {"id": f"cast_{n}", "name": name.strip() or f"Person {n}", "photo": photo}
+    if appearance:
+        entry["appearance"] = appearance
     return jobs.update(job_id, cast=[*cast, entry])
+
+
+@app.post("/api/jobs/{job_id}/cast")
+async def add_cast(job_id: str, file: UploadFile, name: str = Form(...)) -> dict:
+    """Add a photo of a real person to cast as a character (stays on this machine)."""
+    data = await file.read()
+    return add_to_cast(job_id, name, lambda folder, photo: to_png(data, folder, photo))
+
+
+@app.post("/api/jobs/{job_id}/cast/library/{cid}")
+def add_library_cast(job_id: str, cid: str) -> dict:
+    """Cast a saved character; the storyboard uses its saved description instead of re-describing the picture."""
+    c = get_character(cid)
+    if c["status"] != "ready":
+        raise HTTPException(409, "that character is still being made")
+
+    def copy(folder: Path, photo: str) -> None:
+        folder.mkdir(exist_ok=True)
+        shutil.copyfile(characters.char_dir(cid) / "sheet.png", folder / photo)
+
+    return add_to_cast(job_id, c["name"], copy, c["appearance"])
 
 
 @app.delete("/api/jobs/{job_id}/cast/{cast_id}")
@@ -244,6 +271,70 @@ def remove_cast(job_id: str, cast_id: str) -> dict:
         raise HTTPException(404)
     (jobs.job_dir(job_id) / "cast" / entry["photo"]).unlink(missing_ok=True)
     return jobs.update(job_id, cast=[c for c in cast if c is not entry])
+
+
+def get_character(cid: str) -> dict:
+    try:
+        return characters.load(cid)
+    except (KeyError, FileNotFoundError):
+        raise HTTPException(404, "character not found")
+
+
+class CharacterText(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    appearance: str = Field(min_length=1, max_length=2000)
+
+
+@app.get("/api/characters")
+def list_characters() -> list[dict]:
+    return characters.list_all()
+
+
+@app.post("/api/characters")
+def create_character(req: CharacterText) -> dict:
+    """Generate a reference sheet from a description (about a minute; waits behind any running render)."""
+    return characters.create(req.name.strip(), req.appearance.strip())
+
+
+@app.post("/api/characters/photo")
+async def create_photo_character(file: UploadFile, name: str = Form(...)) -> dict:
+    """Save a consented photo of a real person; the vision model writes its description."""
+    png = to_png(await file.read(), characters.LIBRARY, f"upload_{uuid.uuid4().hex[:8]}.png")
+    return characters.from_photo(name.strip() or "Person", png)
+
+
+@app.put("/api/characters/{cid}")
+def redo_character(cid: str, req: CharacterText) -> dict:
+    """Save edits; a generated character also gets a fresh take of its sheet."""
+    if get_character(cid)["status"] not in ("ready", "failed"):
+        raise HTTPException(409, "that character is still being made")
+    return characters.redo(cid, req.name.strip(), req.appearance.strip())
+
+
+@app.post("/api/jobs/{job_id}/characters/{char_id}/save")
+def save_job_character(job_id: str, char_id: str) -> dict:
+    """Copy a character from a video's storyboard into the library."""
+    get_job(job_id)
+    try:
+        return characters.from_job(jobs.job_dir(job_id), char_id)
+    except (StopIteration, FileNotFoundError):
+        raise HTTPException(404, "that character has no picture yet")
+
+
+@app.delete("/api/characters/{cid}")
+def delete_character(cid: str) -> dict:
+    get_character(cid)
+    characters.delete(cid)
+    return {"deleted": cid}
+
+
+@app.get("/api/characters/{cid}/sheet.png")
+def character_sheet(cid: str):
+    get_character(cid)
+    path = characters.char_dir(cid) / "sheet.png"
+    if not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path)
 
 
 if WEB_DIR.is_dir():

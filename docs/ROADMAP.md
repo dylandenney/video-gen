@@ -24,3 +24,4 @@
 5. [x] Lyric videos (export option: big centered lines over a dimmed picture).
 6. [x] Style presets (one-click style notes in the Lyrics and style step).
 7. Maintenance and extension documentation.
+8. [x] Character library (Characters page: create from text or photo, redraw, save from a video, cast in any video).

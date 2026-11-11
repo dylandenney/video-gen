@@ -149,7 +149,8 @@ def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
     slots = plan_slots(analysis, lyrics)
-    cast = [{**c, "description": describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
+    # Library characters bring their saved appearance; plain photos are described by the vision model.
+    cast = [{**c, "description": c.get("appearance") or describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
     prompt = build_prompt(job, analysis, lyrics, slots, cast)
 
     for _ in range(2):

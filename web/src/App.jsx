@@ -58,6 +58,7 @@ export default function App() {
           Upload song
           <input type="file" accept="audio/*" onChange={upload} hidden />
         </label>
+        <button className={current === "characters" ? "active" : ""} onClick={() => setCurrent("characters")}>Characters</button>
         {error && <p className="error">{error}</p>}
         <ul className="jobs">
           {jobs.map((j) => (
@@ -75,7 +76,7 @@ export default function App() {
           </p>
         )}
       </aside>
-      <main>{current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
+      <main>{current === "characters" ? <Characters /> : current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
     </div>
   );
 }
@@ -257,6 +258,8 @@ function Export({ jobId, version }) {
 function Cast({ job, disabled, onChange }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [library, setLibrary] = useState([]);
+  useEffect(() => { api("/characters").then((cs) => setLibrary(cs.filter((c) => c.status === "ready"))).catch(() => {}); }, []);
   const cast = job.cast || [];
 
   async function add(e) {
@@ -278,7 +281,7 @@ function Cast({ job, disabled, onChange }) {
   return (
     <section>
       <h3>3. Cast (optional)</h3>
-      <p className="muted">Add up to 3 photos of real people to star in the video. Clear, front-facing photos work best. Photos stay on this machine. Only use photos of people who agreed.</p>
+      <p className="muted">Add up to 3 people to star in the video: saved characters from the library, or photos. Clear, front-facing photos work best. Photos stay on this machine. Only use photos of people who agreed.</p>
       <div className="cast">
         {cast.map((c) => (
           <figure key={c.id}>
@@ -294,6 +297,12 @@ function Cast({ job, disabled, onChange }) {
         <div className="row">
           <input type="text" placeholder="Name, e.g. Dylan" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 200, marginBottom: 0 }} />
           <label className="button">Add photo<input type="file" accept="image/*" onChange={add} hidden /></label>
+          {library.length > 0 && (
+            <select value="" onChange={(e) => e.target.value && api(`/jobs/${job.id}/cast/library/${e.target.value}`, { method: "POST" }).then(onChange).catch((err) => setError(err.message))}>
+              <option value="">Add from library…</option>
+              {library.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
         </div>
       )}
       {error && <p className="error">{error}</p>}
@@ -315,7 +324,8 @@ function Storyboard({ board, frames, img, busy, jobId, onJob, onBoard }) {
         {board.characters.map((c) => (
           <figure key={c.id}>
             {frames?.characters[c.id] && <img src={img(frames.characters[c.id])} alt={c.name} />}
-            <figcaption><b>{c.name}</b>: {c.appearance}</figcaption>
+            <figcaption><b>{c.name}</b>: {c.appearance}
+              {frames?.characters[c.id] && <SaveCharacter jobId={jobId} charId={c.id} />}</figcaption>
           </figure>
         ))}
       </div>
@@ -410,5 +420,100 @@ function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
       )}
       {error && <p className="error">{error}</p>}
     </article>
+  );
+}
+
+function SaveCharacter({ jobId, charId }) {
+  const [saved, setSaved] = useState(false);
+  if (saved) return <span className="muted"> · saved to library</span>;
+  return <button className="link" onClick={() => api(`/jobs/${jobId}/characters/${charId}/save`, { method: "POST" }).then(() => setSaved(true))}>save to library</button>;
+}
+
+const sheet = (c) => `/api/characters/${c.id}/sheet.png?v=${c.updated}`;
+const BUSY = { rendering: "drawing…", describing: "reading photo…" };
+
+function Characters() {
+  const [chars, setChars] = useState([]);
+  const [form, setForm] = useState({ name: "", appearance: "" });
+  const [error, setError] = useState("");
+  const refresh = () => api("/characters").then(setChars).catch(() => {});
+  useEffect(() => { refresh(); }, []);
+  const working = chars.some((c) => BUSY[c.status]);
+  useEffect(() => {
+    if (!working) return;
+    const t = setInterval(refresh, 3000);
+    return () => clearInterval(t);
+  }, [working]);
+
+  async function act(fn) {
+    setError("");
+    try { await fn(); refresh(); } catch (err) { setError(err.message); }
+  }
+  const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+  function photo(e) {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const body = new FormData();
+    body.append("file", f);
+    body.append("name", form.name);
+    act(() => api("/characters/photo", { method: "POST", body }).then(() => setForm({ name: "", appearance: "" })));
+  }
+
+  return (
+    <div>
+      <h2>Characters</h2>
+      <section>
+        <h3>New character</h3>
+        <input type="text" placeholder="Name, e.g. June" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <textarea rows={3} placeholder="Look: age, face, hair, build, clothes, colors. e.g. late-20s woman, auburn bob, freckles, denim jacket over a white tee"
+          value={form.appearance} onChange={(e) => setForm({ ...form, appearance: e.target.value })} />
+        <div className="row">
+          <button className="primary" disabled={!form.name.trim() || !form.appearance.trim()}
+            onClick={() => act(() => api("/characters", json("POST", form)).then(() => setForm({ name: "", appearance: "" })))}>Create</button>
+          <label className="button">Or from a photo<input type="file" accept="image/*" onChange={photo} hidden /></label>
+        </div>
+        <p className="muted">A new picture takes about a minute, longer while a video is rendering. Photos stay on this machine; only use photos of people who agreed, and delete them if asked.</p>
+        {error && <p className="error">{error}</p>}
+      </section>
+      <div className="characters">
+        {chars.map((c) => <CharacterCard key={c.id} c={c} act={act} json={json} />)}
+      </div>
+      {chars.length === 0 && <p className="muted">No saved characters yet. Create one above, or use "save to library" on a video's storyboard.</p>}
+    </div>
+  );
+}
+
+function CharacterCard({ c, act, json }) {
+  const [edit, setEdit] = useState(null);
+  const busy = BUSY[c.status];
+  return (
+    <figure>
+      {busy ? <div className="placeholder">{busy}</div> : <img src={sheet(c)} alt={c.name} />}
+      {edit ? (
+        <>
+          <input type="text" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+          <textarea rows={5} value={edit.appearance} onChange={(e) => setEdit({ ...edit, appearance: e.target.value })} />
+          <div className="row">
+            <button className="primary" onClick={() => act(() => api(`/characters/${c.id}`, json("PUT", edit)).then(() => setEdit(null)))}>
+              {c.source === "photo" ? "Save" : "Save & redraw"}</button>
+            <button onClick={() => setEdit(null)}>Cancel</button>
+          </div>
+        </>
+      ) : (
+        <figcaption>
+          <b>{c.name}</b>{c.source === "photo" && " (photo)"}: {c.appearance}
+          {c.status === "failed" && <span className="error"> Failed: {c.error}</span>}
+          {!busy && (
+            <div className="row">
+              <button className="link" onClick={() => setEdit({ name: c.name, appearance: c.appearance })}>edit</button>
+              {c.source !== "photo" && <button className="link" onClick={() => act(() => api(`/characters/${c.id}`, json("PUT", { name: c.name, appearance: c.appearance })))}>new take</button>}
+              <button className="link" onClick={() => confirm(`Delete ${c.name}?`) && act(() => api(`/characters/${c.id}`, { method: "DELETE" }))}>delete</button>
+            </div>
+          )}
+        </figcaption>
+      )}
+    </figure>
   );
 }
