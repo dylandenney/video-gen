@@ -6,6 +6,7 @@ fixed slot, so the timing can't drift from the music.
 
 Writes storyboard.json.
 """
+import random
 from pathlib import Path
 
 from ..adapters import ollama
@@ -85,6 +86,7 @@ SYSTEM = """You are a music-video director writing a storyboard for a short musi
 Rules:
 - Find the story and emotional arc in the lyrics and music. Support the feeling; don't illustrate every word literally.
 - Define each recurring character ONCE with a fixed, specific appearance (age, face, hair, build, clothing, colors). Reuse the exact same people across scenes.
+- Cast like a real casting director: give every invented character a distinctive, memorable look (exact age, skin tone and heritage, face shape, nose, brows, hair color and cut, one distinguishing feature). Avoid the stock look of "messy dark brown hair, light stubble, denim shirt over a white tee"; follow the casting nudge given.
 - Write exactly one scene per time slot given, with matching "index". Match the slot's energy: calm slots get slow camera moves, high-energy slots get bolder motion.
 - image_prompt: a single cinematic still composed for that frame shape. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text; refer to characters by id in "characters".
 - Every image_prompt must be ONE physically real moment a camera could photograph. Never ask for people or images inside reflections, mirrors, glasses or eyes; ghosts; double exposures; overlays; split screens; visions; memories "in the mind"; or text and signs. Show memory and emotion through light, setting, props (an empty chair, an old photo on the dashboard) and expression instead.
@@ -101,6 +103,19 @@ def describe_photo(path: Path) -> str:
         "Describe the main person in this photo for a film casting sheet, in one paragraph: apparent age range, "
         "gender presentation, build, skin tone, face shape and features, eye color, hair color/length/style, facial hair, "
         "and clothing. Visual facts only; do not guess who they are.")}], temperature=0.2)
+
+
+AGES = ["early 20s", "late 20s", "mid 30s", "early 40s", "late 40s", "50s", "60s"]
+HAIR = ["red hair", "jet black hair", "platinum blond hair", "salt-and-pepper hair", "sandy blond hair", "auburn hair", "silver hair", "chestnut hair", "a shaved head", "black curls"]
+BUILDS = ["lanky", "stocky", "athletic", "heavyset", "wiry", "tall and broad", "short and slight"]
+FEATURES = ["a crooked nose", "a gap-toothed smile", "thick eyebrows", "a beard", "a scar through one eyebrow", "glasses",
+            "deep-set eyes", "a round open face", "high cheekbones", "a clean-shaven square jaw", "freckles", "laugh lines"]
+
+
+def casting_nudge(job_id: str) -> str:
+    """A per-video look suggestion; the LLM otherwise casts the same default people in every video."""
+    r = random.Random(job_id)
+    return f"lead aged {r.choice(AGES)}, {r.choice(HAIR)}, {r.choice(BUILDS)}, {r.choice(FEATURES)}; any heritage that suits the story"
 
 
 def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cast: list[dict]) -> str:
@@ -135,6 +150,8 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         *in_clip,
         "",
         *cast_lines,
+        f"Casting nudge for invented characters (vary from other videos): {casting_nudge(job['id'])}.",
+        "",
         "Time slots (energy 0-1):",
         *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' for s in slots],
     ])
