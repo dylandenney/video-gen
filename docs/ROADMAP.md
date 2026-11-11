@@ -12,7 +12,7 @@
 - [x] Job delete, dates in job list
 - [x] Storyboard rule: only physically filmable shots
 - [ ] ComfyUI as a systemd service (needs sudo once)
-- [ ] Export presets per platform; burned-in lyric captions
+- [x] Export presets per platform (TikTok, Reels, Shorts, small 720p); burned-in lyric captions
 - [ ] AI upscaling to 1080x1920
 - [x] Vision quality check on keyframes with automatic retakes
 

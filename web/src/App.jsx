@@ -185,11 +185,34 @@ function Job({ id, onChange, onDeleted }) {
           <h3>Video</h3>
           <video key={job.updated} controls src={`${file(id, "final.mp4")}?v=${job.updated}`} />
           <p><a className="button" href={file(id, "final.mp4")} download>Download MP4</a></p>
+          <Export jobId={id} version={job.updated} />
         </section>
       )}
 
       {board && <Storyboard board={board} frames={frames} busy={busy} jobId={id} onJob={(j) => { setJob(j); onChange(); }} onBoard={setBoard}
         img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`} />}
+    </div>
+  );
+}
+
+function Export({ jobId, version }) {
+  const [presets, setPresets] = useState({});
+  const [preset, setPreset] = useState("tiktok");
+  const [hasLyrics, setHasLyrics] = useState(false);
+  const [captions, setCaptions] = useState(false);
+  useEffect(() => { fetch("/api/exports").then((r) => r.json()).then(setPresets); }, []);
+  useEffect(() => {
+    fetch(file(jobId, "lyrics.json")).then((r) => r.json()).then((l) => { setHasLyrics(l.lines.length > 0); setCaptions(l.lines.length > 0); });
+  }, [jobId]);
+  return (
+    <div className="export">
+      <h4>Export for a platform</h4>
+      <select value={preset} onChange={(e) => setPreset(e.target.value)}>
+        {Object.entries(presets).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+      </select>
+      <label><input type="checkbox" checked={captions} disabled={!hasLyrics} onChange={(e) => setCaptions(e.target.checked)} /> Lyric captions</label>
+      <a className="button" href={`/api/jobs/${jobId}/export/${preset}?captions=${captions}&v=${version}`} download>Download</a>
+      <p className="muted">Takes about 20 seconds the first time. Captions sit above each app's buttons; audio is leveled to -14 LUFS.</p>
     </div>
   );
 }

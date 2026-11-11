@@ -57,3 +57,5 @@ select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radi
 .jobs li span small.when { display: block; font-size: 12px; color: var(--muted); }
 .job-head { justify-content: space-between; } .job-head h2 { margin: 0; }
 button.link.danger { color: var(--bad); }
+.export { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.export h4, .export p { flex-basis: 100%; margin: 4px 0; }

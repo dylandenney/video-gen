@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import jobs
+from . import export, jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
 from .stages.analyze import ffmpeg, song_overview
@@ -175,6 +175,25 @@ def job_file(job_id: str, name: str):
     if not path.is_file():
         raise HTTPException(404)
     return FileResponse(path, filename=f'{job["title"]}.mp4' if name == "final.mp4" else None)
+
+
+@app.get("/api/exports")
+def export_presets() -> dict:
+    return {k: p["label"] for k, p in export.PRESETS.items()}
+
+
+@app.get("/api/jobs/{job_id}/export/{preset}")
+def export_video(job_id: str, preset: str, captions: bool = False):
+    """Download final.mp4 re-encoded for a platform, optionally with lyric captions."""
+    job = get_job(job_id)
+    if preset not in export.PRESETS:
+        raise HTTPException(404)
+    d = jobs.job_dir(job_id)
+    if not (d / "final.mp4").is_file():
+        raise HTTPException(409, "the video is not finished yet")
+    out = export.build(d, preset, captions)
+    suffix = " captions" if captions else ""
+    return FileResponse(out, filename=f'{job["title"]} - {export.PRESETS[preset]["label"]}{suffix}.mp4')
 
 
 @app.get("/api/jobs/{job_id}/images/{folder}/{name}")
