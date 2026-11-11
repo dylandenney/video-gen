@@ -84,7 +84,8 @@ def run(d: Path, job: dict) -> None:
         chain.append(f"{last}[p{i}]xfade=transition={kind}:duration={dur:.3f}:offset={s['start']:.3f}[x{i}]")
         last = f"[x{i}]"
     fade = min(1.0, duration / 10)
-    chain.append(f"{last}fade=in:d=0.3,fade=out:st={duration - fade:.3f}:d={fade:.3f}[v]")
+    # xfade can restart timestamps mid-stream; renumber frames so the muxer sees the full length.
+    chain.append(f"{last}setpts=N/{FPS}/TB,fade=in:d=0.3,fade=out:st={duration - fade:.3f}:d={fade:.3f}[v]")
     audio = len(scenes)
     ffmpeg(*inputs, "-i", str(d / "clip.wav"), "-filter_complex", ";".join(chain),
            "-map", "[v]", "-map", f"{audio}:a", "-af", f"afade=out:st={duration - fade:.3f}:d={fade:.3f}",
