@@ -150,6 +150,8 @@ function Job({ id, onChange }) {
         <input type="text" placeholder="Style notes, e.g. nostalgic, golden hour, small-town Georgia" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} />
       </section>
 
+      <Cast job={job} disabled={busy} onChange={setJob} />
+
       <section>
         <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
         {error && <p className="error">{error}</p>}
@@ -172,8 +174,55 @@ function Job({ id, onChange }) {
         </section>
       )}
 
-      {board && <Storyboard board={board} frames={frames} img={(name) => `/api/jobs/${id}/keyframes/${name}?v=${job.updated}`} />}
+      {board && <Storyboard board={board} frames={frames} img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`} />}
     </div>
+  );
+}
+
+function Cast({ job, disabled, onChange }) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const cast = job.cast || [];
+
+  async function add(e) {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    setError("");
+    const body = new FormData();
+    body.append("file", f);
+    body.append("name", name);
+    try {
+      onChange(await api(`/jobs/${job.id}/cast`, { method: "POST", body }));
+      setName("");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <section>
+      <h3>3. Cast (optional)</h3>
+      <p className="muted">Add up to 3 photos of real people to star in the video. Clear, front-facing photos work best. Photos stay on this machine. Only use photos of people who agreed.</p>
+      <div className="cast">
+        {cast.map((c) => (
+          <figure key={c.id}>
+            <img src={`/api/jobs/${job.id}/images/cast/${c.photo}`} alt={c.name} />
+            <figcaption>
+              {c.name}
+              {!disabled && <button className="link" onClick={() => api(`/jobs/${job.id}/cast/${c.id}`, { method: "DELETE" }).then(onChange)}>remove</button>}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+      {cast.length < 3 && !disabled && (
+        <div className="row">
+          <input type="text" placeholder="Name, e.g. Dylan" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 200, marginBottom: 0 }} />
+          <label className="button">Add photo<input type="file" accept="image/*" onChange={add} hidden /></label>
+        </div>
+      )}
+      {error && <p className="error">{error}</p>}
+    </section>
   );
 }
 

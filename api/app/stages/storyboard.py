@@ -6,12 +6,13 @@ fixed slot, so the timing can't drift from the music.
 
 Writes storyboard.json.
 """
+import base64
 import json
 from pathlib import Path
 
 import httpx
 
-from ..config import OLLAMA_MODEL, OLLAMA_URL
+from ..config import OLLAMA_MODEL, OLLAMA_URL, VISION_MODEL
 from ..jobs_io import read_json, write_json
 
 MIN_SHOT, TARGET_SHOT, MAX_SHOT = 2.5, 4.0, 5.0
@@ -89,8 +90,33 @@ Rules:
 Reply with JSON only."""
 
 
-def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict]) -> str:
+def describe_photo(path: Path) -> str:
+    """Appearance of the person in a cast photo, from the local vision model."""
+    r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=300, json={
+        "model": VISION_MODEL,
+        "messages": [{"role": "user", "images": [base64.b64encode(path.read_bytes()).decode()], "content": (
+            "Describe the main person in this photo for a film casting sheet, in one paragraph: apparent age range, "
+            "gender presentation, build, skin tone, face shape and features, eye color, hair color/length/style, facial hair, "
+            "and clothing. Visual facts only; do not guess who they are.")}],
+        "stream": False,
+        "keep_alive": 0,
+        "options": {"temperature": 0.2},
+    })
+    r.raise_for_status()
+    return r.json()["message"]["content"].strip()
+
+
+def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cast: list[dict]) -> str:
     p = job["params"]
+    cast_lines = []
+    if cast:
+        cast_lines = [
+            "Cast from the user's photos. These real people MUST be the main characters. Use exactly these ids and names, "
+            "copy each description into their appearance (you may change clothing to fit the story, never face, hair or age), "
+            "and add other characters only if the story needs them:",
+            *[f'- id "{c["id"]}", name "{c["name"]}": {c["description"]}' for c in cast],
+            "",
+        ]
     full = p.get("lyrics", "").strip()
     timed = [f'[{l["start"]:.1f}-{l["end"]:.1f}s] {l["text"]}' for l in lyrics["lines"]]
     if timed:
@@ -110,6 +136,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict]) -> 
         "",
         *in_clip,
         "",
+        *cast_lines,
         "Time slots (energy 0-1):",
         *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' for s in slots],
     ])
@@ -133,7 +160,8 @@ def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
     slots = plan_slots(analysis)
-    prompt = build_prompt(job, analysis, lyrics, slots)
+    cast = [{**c, "description": describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
+    prompt = build_prompt(job, analysis, lyrics, slots, cast)
 
     for _ in range(2):
         board = ask_llm(prompt)
@@ -143,7 +171,14 @@ def run(d: Path, job: dict) -> None:
     else:
         raise RuntimeError(f"LLM returned {len(board['scenes'])} scenes for {len(slots)} slots")
 
-    known = {c["id"] for c in board["characters"]}
+    # Cast members are always characters, tied to their photo, even if the LLM left one out.
+    by_id = {c["id"]: c for c in board["characters"]}
+    for c in cast:
+        by_id.setdefault(c["id"], {"id": c["id"], "name": c["name"], "appearance": c["description"]})
+        by_id[c["id"]]["photo"] = c["photo"]
+    board["characters"] = list(by_id.values())
+
+    known = set(by_id)
     board["scenes"] = [
         {**by_index[s["index"]], **s, "characters": [c for c in by_index[s["index"]]["characters"] if c in known]}
         for s in slots

@@ -1,7 +1,8 @@
 import logging
+import subprocess
 
 import httpx
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -9,7 +10,7 @@ from pydantic import BaseModel, Field
 from . import jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
 from .jobs_io import write_json
-from .stages.analyze import song_overview
+from .stages.analyze import ffmpeg, song_overview
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -110,14 +111,51 @@ def job_file(job_id: str, name: str):
     return FileResponse(path, filename=f'{job["title"]}.mp4' if name == "final.mp4" else None)
 
 
-@app.get("/api/jobs/{job_id}/keyframes/{name}")
-def keyframe(job_id: str, name: str):
+@app.get("/api/jobs/{job_id}/images/{folder}/{name}")
+def image(job_id: str, folder: str, name: str):
     get_job(job_id)
-    folder = jobs.job_dir(job_id) / "keyframes"
-    path = (folder / name).resolve()
-    if path.parent != folder.resolve() or path.suffix != ".png" or not path.is_file():
+    if folder not in ("keyframes", "cast"):
+        raise HTTPException(404)
+    base = (jobs.job_dir(job_id) / folder).resolve()
+    path = (base / name).resolve()
+    if path.parent != base or path.suffix != ".png" or not path.is_file():
         raise HTTPException(404)
     return FileResponse(path)
+
+
+@app.post("/api/jobs/{job_id}/cast")
+async def add_cast(job_id: str, file: UploadFile, name: str = Form(...)) -> dict:
+    """Add a photo of a real person to cast as a character (stays on this machine)."""
+    job = get_job(job_id)
+    cast = job.get("cast", [])
+    if len(cast) >= 3:
+        raise HTTPException(400, "up to 3 cast photos")
+    n = max((int(c["id"].split("_")[1]) for c in cast), default=0) + 1
+    folder = jobs.job_dir(job_id) / "cast"
+    folder.mkdir(exist_ok=True)
+    raw = folder / f"upload_{n}"
+    raw.write_bytes(await file.read())
+    try:
+        # Normalize to PNG, at most 1536 px on the long side.
+        ffmpeg("-i", str(raw), "-vf", "scale=w='min(1536,iw)':h='min(1536,ih)':force_original_aspect_ratio=decrease",
+               "-frames:v", "1", str(folder / f"cast_{n}.png"))
+    except subprocess.CalledProcessError:
+        raise HTTPException(400, "could not read that image")
+    finally:
+        raw.unlink()
+    entry = {"id": f"cast_{n}", "name": name.strip() or f"Person {n}", "photo": f"cast_{n}.png"}
+    return jobs.update(job_id, cast=[*cast, entry])
+
+
+@app.delete("/api/jobs/{job_id}/cast/{cast_id}")
+def remove_cast(job_id: str, cast_id: str) -> dict:
+    job = get_job(job_id)
+    cast = job.get("cast", [])
+    keep = [c for c in cast if c["id"] != cast_id]
+    if len(keep) == len(cast):
+        raise HTTPException(404)
+    (jobs.job_dir(job_id) / "cast" / f"{cast_id}.png").unlink(missing_ok=True)
+    return jobs.update(job_id, cast=keep)
 
 
 if WEB_DIR.is_dir():

@@ -45,3 +45,6 @@ video { max-height: 70vh; max-width: 100%; border-radius: 8px; background: #000;
 .characters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .characters figure { margin: 0; font-size: 14px; }
 .characters img, .scenes img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; margin-bottom: 8px; display: block; }
+.cast { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.cast figure { margin: 0; width: 120px; font-size: 14px; }
+.cast img { width: 120px; height: 160px; object-fit: cover; border-radius: 6px; display: block; margin-bottom: 4px; }
