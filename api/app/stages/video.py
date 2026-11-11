@@ -4,7 +4,7 @@ Motion modes (job param "motion"):
   stills - no video model; assembly animates the keyframes with camera moves
   draft  - Wan 2.2 TI2V 5B, 704x1280 @ 24 fps
   final  - Wan 2.2 I2V 14B + 4-step LoRAs, 720x1280 @ 16 fps, FILM-interpolated to 32 fps;
-           scenes marked "singing" use Wan 2.2 S2V 14B lip-synced to the isolated vocals
+           scenes marked "singing" use Wan 2.2 S2V 14B (8 steps, 16 fps, no FILM: interpolation smeared the mouth) lip-synced to the isolated vocals
 
 Clips are generated a little longer than their scene; assembly trims them.
 Writes clips/NN.mp4.

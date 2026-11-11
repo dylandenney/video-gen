@@ -13,10 +13,8 @@
   "s2v": {"class_type": "WanSoundImageToVideo", "inputs": {"positive": ["pos", 0], "negative": ["neg", 0], "vae": ["vae", 0], "audio_encoder_output": ["audio_enc", 0],
     "ref_image": ["load", 0], "width": "$width", "height": "$height", "length": "$length", "batch_size": 1}},
   "sample": {"class_type": "KSampler", "inputs": {"model": ["shift", 0], "positive": ["s2v", 0], "negative": ["s2v", 1], "latent_image": ["s2v", 2],
-    "seed": "$seed", "steps": 4, "cfg": 1.0, "sampler_name": "uni_pc", "scheduler": "simple", "denoise": 1.0}},
+    "seed": "$seed", "steps": 8, "cfg": 1.0, "sampler_name": "uni_pc", "scheduler": "simple", "denoise": 1.0}},
   "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sample", 0], "vae": ["vae", 0]}},
-  "interp_model": {"class_type": "FrameInterpolationModelLoader", "inputs": {"model_name": "film_net_fp16.safetensors"}},
-  "interp": {"class_type": "FrameInterpolate", "inputs": {"interp_model": ["interp_model", 0], "images": ["decode", 0], "multiplier": 2}},
-  "video": {"class_type": "CreateVideo", "inputs": {"images": ["interp", 0], "fps": 32}},
+  "video": {"class_type": "CreateVideo", "inputs": {"images": ["decode", 0], "fps": 16}},
   "save": {"class_type": "SaveVideo", "inputs": {"video": ["video", 0], "filename_prefix": "musicvid/wan_s2v", "format": "auto", "format.codec": "auto"}}
 }
