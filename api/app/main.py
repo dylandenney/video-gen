@@ -1,6 +1,7 @@
 import logging
 import subprocess
 import uuid
+from typing import Literal
 
 import httpx
 from fastapi import FastAPI, Form, HTTPException, UploadFile
@@ -74,28 +75,32 @@ class GenerateRequest(BaseModel):
     end: float = Field(gt=0)
     lyrics: str = ""
     style: str = ""
+    motion: Literal["stills", "draft", "final"] = "draft"
 
 
-@app.post("/api/jobs/{job_id}/generate")
-def generate(job_id: str, req: GenerateRequest) -> dict:
+def save_params(job_id: str, req: GenerateRequest) -> None:
     job = get_job(job_id)
     if job["status"] in ("queued", "running"):
         raise HTTPException(409, "job is already running")
     if not 5 <= req.end - req.start <= 120:
         raise HTTPException(400, "pick a section between 5 and 120 seconds")
     jobs.update(job_id, params=req.model_dump())
+
+
+@app.post("/api/jobs/{job_id}/generate")
+def generate(job_id: str, req: GenerateRequest) -> dict:
+    save_params(job_id, req)
     return jobs.enqueue(job_id)
 
 
 @app.post("/api/jobs/{job_id}/rerun/{stage}")
-def rerun(job_id: str, stage: str) -> dict:
-    job = get_job(job_id)
+def rerun(job_id: str, stage: str, req: GenerateRequest) -> dict:
+    """Re-run from a stage with the current form values (e.g. a new motion mode or lyrics)."""
     if stage not in jobs.STAGES:
         raise HTTPException(404, "unknown stage")
-    if job["status"] in ("queued", "running"):
-        raise HTTPException(409, "job is already running")
-    if not job["params"]:
+    if not get_job(job_id)["params"]:
         raise HTTPException(400, "generate first")
+    save_params(job_id, req)
     return jobs.enqueue(job_id, stage)
 
 

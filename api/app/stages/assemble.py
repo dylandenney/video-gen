@@ -1,7 +1,7 @@
-"""Stage 5: build the final MP4.
+"""Stage 6: build the final MP4.
 
-Each scene becomes its keyframe with a camera move picked from the storyboard.
-M3 swaps the stills for video clips; cut points stay the same.
+Each scene is its Wan clip fitted to the cut, or in "stills" mode its keyframe
+with a camera move picked from the storyboard.
 
 Writes scenes/NN.mp4 and final.mp4.
 """
@@ -37,6 +37,15 @@ def ken_burns(image: Path, scene: dict, out: Path) -> None:
            "-frames:v", str(n), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", str(out))
 
 
+def fit_clip(clip: Path, scene: dict, out: Path) -> None:
+    """Scale/crop a generated clip to the output size and cut it to exactly the scene's frame count."""
+    n = max(1, round((scene["end"] - scene["start"]) * FPS))
+    ffmpeg("-i", str(clip), "-an", "-vf",
+           f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop={WIDTH}:{HEIGHT},"
+           f"fps={FPS},tpad=stop_mode=clone:stop_duration=1",
+           "-frames:v", str(n), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", str(out))
+
+
 def run(d: Path, job: dict) -> None:
     board = read_json(d / "storyboard.json")
     duration = read_json(d / "analysis.json")["duration"]
@@ -46,7 +55,11 @@ def run(d: Path, job: dict) -> None:
     parts = []
     for s in board["scenes"]:
         out = scenes_dir / f'{s["index"]:02d}.mp4'
-        ken_burns(d / "keyframes" / f'{s["index"]:02d}.png', s, out)
+        clip = d / "clips" / f'{s["index"]:02d}.mp4'
+        if clip.is_file():
+            fit_clip(clip, s, out)
+        else:  # "stills" motion mode
+            ken_burns(d / "keyframes" / f'{s["index"]:02d}.png', s, out)
         parts.append(out)
 
     concat = d / "concat.txt"

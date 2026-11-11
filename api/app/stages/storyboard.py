@@ -18,11 +18,14 @@ from ..jobs_io import read_json, write_json
 MIN_SHOT, TARGET_SHOT, MAX_SHOT = 2.5, 4.0, 5.0
 
 
-def plan_slots(analysis: dict) -> list[dict]:
+def plan_slots(analysis: dict, lyrics: dict) -> list[dict]:
     dur, beats = analysis["duration"], analysis["beats"]
     section_starts = {round(s["start"], 3) for s in analysis["sections"]}
-    # Candidate cuts: every 4th beat (assumed bar line) plus section starts.
-    cuts = sorted({*beats[::4], *section_starts} - {0.0})
+    # Where a sung line starts is the strongest place to cut.
+    phrases = {round(l["start"], 3) for l in lyrics["lines"]}
+    # Beat trackers often double-count slow songs; above 130 BPM treat 8 beats as a bar.
+    bar = 8 if analysis["tempo"] > 130 else 4
+    cuts = sorted({*beats[::bar], *section_starts, *phrases} - {0.0})
     if not cuts:
         cuts = [i * TARGET_SHOT for i in range(1, int(dur / TARGET_SHOT) + 1)]
 
@@ -30,8 +33,8 @@ def plan_slots(analysis: dict) -> list[dict]:
     while dur - t > MAX_SHOT:
         options = [c for c in cuts if MIN_SHOT <= c - t <= MAX_SHOT]
         if options:
-            # Prefer a section change, otherwise the cut nearest the target length.
-            nxt = min(options, key=lambda c: (c not in section_starts, abs(c - t - TARGET_SHOT)))
+            # Prefer a sung phrase, then a section change, then the cut nearest the target length.
+            nxt = min(options, key=lambda c: (c not in phrases, c not in section_starts, abs(c - t - TARGET_SHOT)))
         else:
             nxt = t + TARGET_SHOT
         bounds.append(nxt)
@@ -159,7 +162,7 @@ def ask_llm(prompt: str) -> dict:
 def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
-    slots = plan_slots(analysis)
+    slots = plan_slots(analysis, lyrics)
     cast = [{**c, "description": describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
     prompt = build_prompt(job, analysis, lyrics, slots, cast)
 

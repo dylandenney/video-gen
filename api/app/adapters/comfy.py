@@ -53,7 +53,7 @@ def upload_image(path: Path) -> str:
 
 
 def run(graph: dict, out: Path, timeout: float = 1800) -> Path:
-    """Queue a workflow, wait for it, and save its first output image to `out`."""
+    """Queue a workflow, wait for it, and save its first output file (image or video) to `out`."""
     r = httpx.post(f"{COMFY_URL}/prompt", json={"prompt": graph, "client_id": CLIENT_ID}, timeout=30)
     if r.status_code != 200:
         raise RuntimeError(f"ComfyUI rejected workflow: {r.text[:500]}")
@@ -71,9 +71,11 @@ def run(graph: dict, out: Path, timeout: float = 1800) -> Path:
     else:
         raise TimeoutError(f"ComfyUI job {prompt_id} timed out")
 
-    image = next(img for node in h["outputs"].values() for img in node.get("images", []))
-    data = httpx.get(f"{COMFY_URL}/view", params=image, timeout=60).content
-    out.write_bytes(data)
+    # Images and videos both come back under "images".
+    f = next(f for node in h["outputs"].values() for f in node.get("images", []))
+    r = httpx.get(f"{COMFY_URL}/view", params={k: f[k] for k in ("filename", "subfolder", "type")}, timeout=300)
+    r.raise_for_status()
+    out.write_bytes(r.content)
     return out
 
 

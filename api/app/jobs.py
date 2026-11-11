@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .config import JOBS_DIR
 from .jobs_io import read_json, write_json
-from .stages import analyze, lyrics, storyboard, keyframes, assemble
+from .stages import analyze, lyrics, storyboard, keyframes, video, assemble
 
 log = logging.getLogger("musicvid.jobs")
 
@@ -22,6 +22,7 @@ STAGES = {
     "lyrics": lyrics.run,
     "storyboard": storyboard.run,
     "keyframes": keyframes.run,
+    "video": video.run,
     "assemble": assemble.run,
 }
 

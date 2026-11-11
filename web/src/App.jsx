@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const STAGE_LABELS = { audio: "Audio analysis", lyrics: "Lyrics", storyboard: "Storyboard", keyframes: "Characters & keyframes", assemble: "Assemble video" };
+const STAGE_LABELS = { audio: "Audio analysis", lyrics: "Lyrics", storyboard: "Storyboard", keyframes: "Characters & keyframes", video: "Video clips", assemble: "Assemble video" };
 
 async function api(path, opts) {
   const r = await fetch(`/api${path}`, opts);
@@ -73,7 +73,7 @@ function Job({ id, onChange }) {
   const [job, setJob] = useState(null);
   const [overview, setOverview] = useState(null);
   const [board, setBoard] = useState(null);
-  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "" });
+  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", motion: "draft" });
   const [error, setError] = useState("");
   const audio = useRef(null);
 
@@ -83,7 +83,7 @@ function Job({ id, onChange }) {
     setError("");
     api(`/jobs/${id}`).then((j) => {
       setJob(j);
-      if (j.params.start !== undefined) setForm(j.params);
+      if (j.params.start !== undefined) setForm({ motion: "draft", ...j.params });
     });
     fetch(file(id, "overview.json")).then((r) => r.json()).then(setOverview);
   }, [id]);
@@ -153,14 +153,24 @@ function Job({ id, onChange }) {
       <Cast job={job} disabled={busy} onChange={setJob} />
 
       <section>
-        <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
+        <div className="row">
+          <label>Motion{" "}
+            <select value={form.motion} onChange={(e) => setForm({ ...form, motion: e.target.value })}>
+              <option value="stills">Stills with camera moves (fastest)</option>
+              <option value="draft">Draft video (Wan 5B)</option>
+              <option value="final">Final video (Wan 14B, slowest)</option>
+            </select>
+          </label>
+          <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
+        </div>
+        <p className="muted">Tip: to try a different motion setting, change it and click "re-run from here" on Video clips.</p>
         {error && <p className="error">{error}</p>}
         {job.error && <p className="error">Failed at {job.error}</p>}
         <ol className="stages">
           {Object.entries(job.stages).map(([name, status]) => (
             <li key={name} className={status}>
               {STAGE_LABELS[name]} <small>{status}</small>
-              {!busy && job.params.start !== undefined && <button className="link" onClick={() => run(`/jobs/${id}/rerun/${name}`)}>re-run from here</button>}
+              {!busy && job.params.start !== undefined && <button className="link" onClick={() => run(`/jobs/${id}/rerun/${name}`, form)}>re-run from here</button>}
             </li>
           ))}
         </ol>
