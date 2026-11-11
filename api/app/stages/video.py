@@ -4,8 +4,9 @@ Motion modes (job param "motion"):
   stills - no video model; assembly animates the keyframes with camera moves
   draft  - Wan 2.2 TI2V 5B, 544x960 @ 24 fps (below its native 704x1280, for about 2x faster previews)
   final  - Wan 2.2 I2V 14B + 4-step LoRAs, 720x1280 @ 16 fps, FILM-interpolated to 32 fps
-In both draft and final, scenes marked "singing" use Wan 2.2 S2V 14B lip-synced to the isolated
-vocals (8 steps, 16 fps, no FILM: interpolation smeared the mouth), at a lower size in draft.
+In both draft and final, scenes marked "singing" use InfiniteTalk (Wan 2.1 I2V 14B 480p + InfiniteTalk patch,
+6 steps, 480x832 @ 25 fps) lip-synced to the isolated vocals. It beat Wan 2.2 S2V on expression in testing,
+and 720p looked no better than 480p at over 4x the time.
 
 Clips are generated a little longer than their scene; assembly trims them.
 Writes clips/NN.mp4.
@@ -33,8 +34,8 @@ MODES = {
     "draft": ("wan22_ti2v_5b", 544, 960, 24),
     "final": ("wan22_i2v_14b", 720, 1280, 16),
 }
-# Lip-synced singing scenes: S2V 14B at 16 fps, smaller in draft.
-SINGING = {"draft": (480, 832), "final": (720, 1280)}
+# Lip-synced singing scenes (InfiniteTalk), same size in every mode.
+SINGING = ("wan21_infinitetalk", 480, 832, 25)
 
 
 def frames_for(seconds: float, fps: int) -> int:
@@ -67,8 +68,7 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
     seconds = s["end"] - s["start"] + 0.6
     audio = None
     if s.get("singing") and s["characters"]:
-        workflow, fps = "wan22_s2v_14b", 16
-        w, h = SINGING[mode]
+        workflow, w, h, fps = SINGING
         vocals, sr = sf.read(isolate_vocals(d))
         part = d / "clips" / f'{s["index"]:02d}_vocals.wav'
         sf.write(part, vocals[int(s["start"] * sr):int((s["start"] + seconds) * sr)], sr)
