@@ -46,11 +46,19 @@ QC_QUESTIONS = {
 QC_SCHEMA = {"type": "object", "required": list(QC_QUESTIONS), "properties": {k: {"type": "boolean"} for k in QC_QUESTIONS}}
 
 
-def check(path: Path) -> list[str]:
-    """Defects the local vision model sees in a keyframe; empty means it looks fine."""
-    ask = "Inspect this AI-generated film frame for defects. Answer each strictly: " + " ".join(f"{k}: {q}" for k, q in QC_QUESTIONS.items())
+def check(path: Path, outfits: list[tuple[str, str]]) -> list[str]:
+    """Defects the local vision model sees in a keyframe; empty means it looks fine.
+
+    outfits: (name, appearance) of each person when there are several, to catch swapped clothes.
+    """
+    questions, schema = QC_QUESTIONS, QC_SCHEMA
+    if outfits:
+        people = " ".join(f"{name}: {look}" for name, look in outfits)
+        questions = {**QC_QUESTIONS, "swapped_outfits": f"these people should appear: {people} Is anyone wearing clothes described for a different person?"}
+        schema = {"type": "object", "required": list(questions), "properties": {k: {"type": "boolean"} for k in questions}}
+    ask = "Inspect this AI-generated film frame for defects. Answer each strictly: " + " ".join(f"{k}: {q}" for k, q in questions.items())
     result = ollama.chat(VISION_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": ask}],
-                         schema=QC_SCHEMA, keep_alive="2m", temperature=0)
+                         schema=schema, keep_alive="2m", temperature=0)
     return [k for k, bad in result.items() if bad]
 
 
@@ -76,12 +84,13 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     aspect = board.get("aspect", "9:16")
     w, h = oriented(W, H, aspect)
     refs = s["characters"][:3]
+    outfits = []
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
-        # Generated sheets already wear the story's clothes; real photos get dressed from the storyboard text.
-        who = "; ".join(f"{chars[cid]['name']} is the person in image {n + 1}" +
-                        (f", dressed as described: {chars[cid]['appearance']}" if "photo" in chars[cid] else "")
+        # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
+        who = "; ".join(f"{chars[cid]['name']} is the person in image {n + 1}, looking and dressed exactly as described: {chars[cid]['appearance']}"
                         for n, cid in enumerate(refs))
+        outfits = [(chars[cid]["name"], chars[cid]["appearance"]) for cid in refs] if len(refs) > 1 else []
         images = [comfy.upload(char_path(d, cid)) for cid in refs] + [None] * (3 - len(refs))
 
     for attempt in range(QC_ATTEMPTS):
@@ -96,7 +105,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
             graph = comfy.fill("qwen_image_t2i", width=w, height=h, seed=seed, negative=NEGATIVE,
                                prompt=f'{s["image_prompt"]}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
         comfy.run(graph, path)
-        problems = check(path)
+        problems = check(path, outfits)
         if not problems:
             return
         log.info("scene %d attempt %d rejected: %s", s["index"], attempt + 1, "; ".join(problems))
