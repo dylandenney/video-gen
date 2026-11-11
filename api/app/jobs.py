@@ -81,12 +81,13 @@ def list_jobs() -> list[dict]:
     return sorted(jobs, key=lambda j: j["created"], reverse=True)
 
 
-def _submit(job_id: str, steps: list[tuple[str, Callable]]) -> dict:
+def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = None) -> dict:
     """Queue (stage name, fn(job_dir, job)) steps; the named stages show as pending until they run."""
     job = load(job_id)
     pending = {name for name, _ in steps}
     stages = {n: ("pending" if n in pending else job["stages"].get(n, "pending")) for n in STAGES}
-    job = update(job_id, status="queued", stages=stages, error=None)
+    # "run" lets the progress estimate know which stages, and which scenes, this run covers.
+    job = update(job_id, status="queued", stages=stages, error=None, run={"steps": [n for n, _ in steps], "scene": scene})
     _queue.put((job_id, steps))
     return job
 
@@ -118,14 +119,14 @@ def enqueue_scene(job_id: str, index: int, image: bool) -> dict:
             comfy.free()
 
     steps = [("keyframes", redo_image)] if image else []
-    return _submit(job_id, steps + [("video", redo_clip), ("assemble", assemble.run)])
+    return _submit(job_id, steps + [("video", redo_clip), ("assemble", assemble.run)], scene=index)
 
 
 def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
     update(job_id, status="running")
     for name, fn in steps:
         job = load(job_id)
-        update(job_id, stages={**job["stages"], name: "running"})
+        update(job_id, stages={**job["stages"], name: "running"}, stage_started=time.time())
         t0 = time.time()
         try:
             fn(job_dir(job_id), job)
@@ -152,3 +153,61 @@ def start_worker() -> None:
         if job["status"] in ("queued", "running"):
             update(job["id"], status="failed", error="interrupted by restart")
     threading.Thread(target=_worker, daemon=True).start()
+
+
+# Typical minutes on the DGX Spark with nothing else running, used until a stage has finished scenes to measure.
+FIXED = {"audio": 0.3, "lyrics": 0.5, "storyboard": 2.5, "keyframes": 1.0, "video": 0.3, "assemble": 1.0}
+KEYFRAME = 0.6
+CLIP = {"stills": 0.0, "draft": 2.0, "final": 5.0}
+SINGING_CLIP = 4.0
+SCENE_SECONDS = 3.6  # average scene length, to guess the scene count before a storyboard exists
+OUTPUTS = {"keyframes": ("keyframes", "[0-9][0-9].png"), "video": ("clips", "[0-9][0-9].mp4")}
+
+
+def typical(stage: str, scenes: int, singing: int, motion: str) -> float:
+    if stage == "keyframes":
+        return FIXED[stage] + scenes * KEYFRAME
+    if stage == "video":
+        return 0.0 if motion == "stills" else FIXED[stage] + (scenes - singing) * CLIP[motion] + singing * SINGING_CLIP
+    return FIXED[stage]
+
+
+def estimate(job: dict, params: dict | None = None) -> dict | None:
+    """Minutes left for a queued or running job, or for a full run with `params` if one were started now.
+
+    A running keyframes or video stage is timed from the scenes it has already finished, so a
+    busy or slow machine shows up in the estimate.
+    """
+    if params is None and job["status"] not in ("queued", "running"):
+        return None
+    d = job_dir(job["id"])
+    p = params or job["params"]
+    run = job.get("run") or {"steps": list(STAGES), "scene": None}
+    steps = list(STAGES) if params else run["steps"]
+    has_board = not params and (d / "storyboard.json").is_file()
+    scenes = read_json(d / "storyboard.json")["scenes"] if has_board else []
+    if run["scene"] is not None and not params:
+        scenes = [s for s in scenes if s["index"] == run["scene"]]
+    n = len(scenes) or max(1, round((p["end"] - p["start"]) / SCENE_SECONDS))
+    singing = sum(1 for s in scenes if s.get("singing") and s["characters"])
+    motion = p.get("motion", "draft")
+
+    left, now, current = 0.0, time.time(), {}
+    for name in steps:
+        status = "pending" if params else job["stages"].get(name)
+        if status == "done":
+            continue
+        guess = typical(name, n, singing, motion)
+        if status != "running":
+            left += guess
+            continue
+        started = job.get("stage_started", now)
+        folder, pattern = OUTPUTS.get(name, (None, None))
+        finished = sorted(t for f in (d / folder).glob(pattern) if (t := f.stat().st_mtime) >= started) if folder else []
+        if folder and scenes and finished and (name != "video" or motion != "stills"):
+            per = (finished[-1] - started) / 60 / len(finished)
+            left += max(per * (len(scenes) - len(finished)) - (now - finished[-1]) / 60, 0.5)
+        else:
+            left += max(guess - (now - started) / 60, 0.5)
+        current = {"stage": name, "done": len(finished), "total": len(scenes)} if folder and scenes else {"stage": name}
+    return {**current, "minutes_left": round(left, 1)}

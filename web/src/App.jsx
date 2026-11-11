@@ -20,6 +20,8 @@ const STYLE_PRESETS = {
 };
 const file = (id, name) => `/api/jobs/${id}/files/${name}`;
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const minutes = (m) => (m < 1 ? "under a minute" : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} hours`);
+const clock = (m) => new Date(Date.now() + m * 60000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 const when = (ts) => new Date(ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default function App() {
@@ -118,6 +120,13 @@ function Job({ id, onChange, onDeleted }) {
     else setFrames(null);
   }, [id, job?.stages.keyframes, job?.updated]);
 
+  const [plan, setPlan] = useState(null);
+  useEffect(() => {
+    if (busy) return;
+    const t = setTimeout(() => api(`/jobs/${id}/estimate?start=${form.start}&end=${form.end}&motion=${form.motion}`).then(setPlan).catch(() => setPlan(null)), 300);
+    return () => clearTimeout(t);
+  }, [id, busy, form.start, form.end, form.motion]);
+
   if (!job || !overview) return <p className="muted">Loading…</p>;
 
   async function run(path, body) {
@@ -202,6 +211,12 @@ function Job({ id, onChange, onDeleted }) {
           </label>
           <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
         </div>
+        {!busy && plan && <p className="muted">A full run takes about {minutes(plan.minutes_left)} with nothing else running.</p>}
+        {busy && job.eta && (
+          <p className="eta">
+            {job.status === "queued" ? "Queued" : STAGE_LABELS[job.eta.stage]}{job.eta.total ? `: ${job.eta.done} of ${job.eta.total}` : ""} · about {minutes(job.eta.minutes_left)} left · done around {clock(job.eta.minutes_left)}
+          </p>
+        )}
         <p className="muted">Tip: to try a different motion setting, change it and click "re-run from here" on Video clips. A new frame shape needs a re-run from Storyboard.</p>
         {error && <p className="error">{error}</p>}
         {job.error && <p className="error">Failed at {job.error}</p>}

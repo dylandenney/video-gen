@@ -69,7 +69,14 @@ async def upload(file: UploadFile) -> dict:
 
 @app.get("/api/jobs/{job_id}")
 def job_status(job_id: str) -> dict:
-    return get_job(job_id)
+    job = get_job(job_id)
+    return {**job, "eta": jobs.estimate(job)}
+
+
+@app.get("/api/jobs/{job_id}/estimate")
+def run_estimate(job_id: str, start: float, end: float, motion: Literal["stills", "draft", "final"] = "draft") -> dict:
+    """Rough minutes for a full run with these settings, before it starts."""
+    return jobs.estimate(get_job(job_id), {"start": start, "end": end, "motion": motion})
 
 
 @app.delete("/api/jobs/{job_id}")

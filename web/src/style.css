@@ -61,3 +61,4 @@ button.link.danger { color: var(--bad); }
 .export h4, .export p { flex-basis: 100%; margin: 4px 0; }
 .placeholder { width: 100%; aspect-ratio: 9 / 16; border-radius: 6px; margin-bottom: 8px; display: grid; place-items: center; background: #8882; color: #888; }
 aside > button { width: 100%; margin-top: 8px; }
+.eta { font-weight: 600; margin: 8px 0; }
