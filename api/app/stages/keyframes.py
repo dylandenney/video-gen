@@ -19,8 +19,8 @@ from ..jobs_io import read_json, write_json
 
 # 9:16 size Qwen-Image was trained on (turned for 16:9); assembly scales it to the output size.
 W, H = 928, 1664
-COMPOSITION = {"9:16": "vertical 9:16 composition", "16:9": "horizontal 16:9 widescreen composition"}
-NEGATIVE = "low resolution, blurry, deformed hands, extra fingers, distorted face, oversaturated, waxy skin, text, watermark, logo"
+COMPOSITION = {"9:16": "vertical 9:16 composition", "16:9": "horizontal 16:9 composition filling the whole frame edge to edge, no black letterbox bars"}
+NEGATIVE = "low resolution, blurry, deformed hands, extra fingers, distorted face, oversaturated, waxy skin, text, watermark, logo, letterbox, black bars"
 QC_ATTEMPTS = 3  # first take + up to two retries when the vision check finds defects
 
 log = logging.getLogger("musicvid.keyframes")
@@ -41,6 +41,7 @@ QC_QUESTIONS = {
     "bad_hands": "are there extra, missing or fused fingers?",
     "distorted_face": "is any face warped?",
     "garbled_text": "is there unreadable text?",
+    "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
 }
 QC_SCHEMA = {"type": "object", "required": list(QC_QUESTIONS), "properties": {k: {"type": "boolean"} for k in QC_QUESTIONS}}
 
