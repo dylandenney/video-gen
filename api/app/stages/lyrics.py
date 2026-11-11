@@ -1,10 +1,10 @@
 """Stage 2: work out which lyric lines are sung in the clip, and when.
 
-With WHISPER_MODEL set, the clip is transcribed with word timestamps and the
-pasted Suno lyrics are matched against it (the pasted text wins over Whisper's
-spelling). Without it, the pasted lyrics are passed on untimed.
+The clip is transcribed with word timestamps and the pasted Suno lyrics are
+matched against it (the pasted text wins over Whisper's spelling). The
+storyboard also gets the full pasted lyrics for story context.
 
-Writes lyrics.json: {"source": ..., "lines": [{"text", "start", "end"}]}.
+Writes lyrics.json: {"source": "pasted-aligned" | "none", "lines": [{"text", "start", "end"}]}.
 """
 import re
 from difflib import SequenceMatcher
@@ -31,34 +31,42 @@ def transcribe(path: Path) -> list[dict]:
 
     model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", download_root=str(MODELS_DIR / "whisper"))
     audio, _ = librosa.load(path, sr=16000, mono=True)
-    segments, _ = model.transcribe(audio, word_timestamps=True, vad_filter=True)
-    return [{"w": norm(w.word), "start": w.start, "end": w.end} for s in segments for w in s.words if norm(w.word)]
+    # No VAD: it treats singing over a full band as non-speech and drops most of it.
+    segments, _ = model.transcribe(audio, word_timestamps=True, vad_filter=False, condition_on_previous_text=False)
+    return [{"w": norm(w.word), "start": float(w.start), "end": float(w.end)} for s in segments for w in s.words if norm(w.word)]
 
 
 def align(lines: list[str], words: list[dict]) -> list[dict]:
-    out, pos = [], 0
-    for line in lines:
+    """Place each pasted line where it best matches the transcript.
+
+    Every good window of every line is a candidate; the strongest claim their
+    words first, and a line whose best window is taken falls back to its next.
+    """
+    candidates = []
+    for line in dict.fromkeys(lines):  # choruses repeat; match each distinct line once
         target = norm(line)
-        n = len(target.split())
-        best, best_i = 0.0, -1
-        for i in range(pos, min(len(words) - n + 1, pos + 60)):
-            r = SequenceMatcher(None, target, " ".join(w["w"] for w in words[i:i + n])).ratio()
-            if r > best:
-                best, best_i = r, i
-        if best >= 0.5:
-            out.append({"text": line, "start": round(words[best_i]["start"], 2), "end": round(words[best_i + n - 1]["end"], 2)})
-            pos = best_i + n
-    return out
+        size = len(target.split())
+        # Whisper often drops or adds a word, so also try windows one word shorter/longer.
+        for n in (size - 1, size, size + 1):
+            for i in range(len(words) - n + 1):
+                r = SequenceMatcher(None, target, " ".join(w["w"] for w in words[i:i + n])).ratio()
+                if n > 0 and r >= 0.75:
+                    candidates.append((r, i, n, line))
+
+    taken, placed, out = set(), set(), []
+    for r, i, n, line in sorted(candidates, reverse=True):
+        if line in placed or taken & set(range(i, i + n)):
+            continue
+        taken.update(range(i, i + n))
+        placed.add(line)
+        out.append({"text": line, "start": round(words[i]["start"], 2), "end": round(words[i + n - 1]["end"], 2)})
+    return sorted(out, key=lambda l: l["start"])
 
 
 def run(d: Path, job: dict) -> None:
     lines = pasted_lines(job["params"].get("lyrics", ""))
-    if not WHISPER_MODEL:
-        result = {"source": "pasted-untimed", "lines": [{"text": l, "start": None, "end": None} for l in lines]}
+    if not WHISPER_MODEL or not lines:
+        result = {"source": "none", "lines": []}
     else:
-        words = transcribe(d / "clip.wav")
-        if lines:
-            result = {"source": "pasted-aligned", "lines": align(lines, words)}
-        else:
-            result = {"source": "whisper", "lines": [{"text": w["w"], "start": round(w["start"], 2), "end": round(w["end"], 2)} for w in words]}
+        result = {"source": "pasted-aligned", "lines": align(lines, transcribe(d / "clip.wav"))}
     write_json(d / "lyrics.json", result)

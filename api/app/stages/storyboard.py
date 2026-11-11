@@ -91,19 +91,24 @@ Reply with JSON only."""
 
 def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict]) -> str:
     p = job["params"]
-    lines = []
-    for l in lyrics["lines"]:
-        lines.append(f'[{l["start"]:.1f}-{l["end"]:.1f}s] {l["text"]}' if l["start"] is not None else l["text"])
-    timing_note = ("Lyrics are timed to the clip." if lyrics["source"] == "pasted-aligned" else
-                   f'Lyrics are for the whole song; this clip is {p["start"]:.0f}-{p["end"]:.0f}s of the song, so focus on the part likely sung there.')
+    full = p.get("lyrics", "").strip()
+    timed = [f'[{l["start"]:.1f}-{l["end"]:.1f}s] {l["text"]}' for l in lyrics["lines"]]
+    if timed:
+        in_clip = ["Sung in this clip (seconds from clip start):", *timed]
+    elif full:
+        in_clip = [f'This clip is {p["start"]:.0f}-{p["end"]:.0f}s of the song; focus on the part of the lyrics likely sung there.']
+    else:
+        in_clip = []
     return "\n".join([
         f'Song: "{job["title"]}"',
         f'Style notes from the user: {p.get("style") or "none"}',
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
         "",
-        "Lyrics:" if lines else "No lyrics provided (instrumental or unknown).",
-        *lines,
-        timing_note if lines else "",
+        "Full song lyrics (the story and genre come from these; a first line may list the genre):" if full
+        else "No lyrics provided (instrumental or unknown).",
+        full,
+        "",
+        *in_clip,
         "",
         "Time slots (energy 0-1):",
         *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' for s in slots],
