@@ -87,6 +87,7 @@ Rules:
 - Define each recurring character ONCE with a fixed, specific appearance (age, face, hair, build, clothing, colors). Reuse the exact same people across scenes.
 - Write exactly one scene per time slot given, with matching "index". Match the slot's energy: calm slots get slow camera moves, high-energy slots get bolder motion.
 - image_prompt: a single cinematic still for a 9:16 frame. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text; refer to characters by id in "characters".
+- Every image_prompt must be ONE physically real moment a camera could photograph. Never ask for people or images inside reflections, mirrors, glasses or eyes; ghosts; double exposures; overlays; split screens; visions; memories "in the mind"; or text and signs. Show memory and emotion through light, setting, props (an empty chair, an old photo on the dashboard) and expression instead.
 - camera: one camera move (e.g. slow push-in, orbit left, static, handheld drift). motion: what moves in the shot.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
 - One consistent visual_style and palette (3-5 hex colors) for the whole video.
