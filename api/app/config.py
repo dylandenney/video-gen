@@ -1,0 +1,21 @@
+import os
+from pathlib import Path
+
+DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
+JOBS_DIR = DATA_DIR / "jobs"
+MODELS_DIR = DATA_DIR / "models"
+
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:27b")
+COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
+
+# Empty = lyric alignment disabled (no model download). e.g. "large-v3-turbo"
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "")
+
+WIDTH = int(os.environ.get("OUTPUT_WIDTH", "1080"))
+HEIGHT = int(os.environ.get("OUTPUT_HEIGHT", "1920"))
+FPS = int(os.environ.get("OUTPUT_FPS", "30"))
+
+WEB_DIR = Path(os.environ.get("WEB_DIR", "/app/web"))
+
+JOBS_DIR.mkdir(parents=True, exist_ok=True)
