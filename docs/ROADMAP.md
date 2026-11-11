@@ -13,7 +13,7 @@
 - [x] Storyboard rule: only physically filmable shots
 - [ ] ComfyUI as a systemd service (needs sudo once)
 - [x] Export presets per platform (TikTok, Reels, Shorts, small 720p); burned-in lyric captions
-- [ ] AI upscaling to 1080x1920
+- [~] AI upscaling: tested Real-ESRGAN x2, dropped (2x render time, waxy skin). Model kept.
 - [x] Vision quality check on keyframes with automatic retakes
 
 ## M5 — bigger features (in order)

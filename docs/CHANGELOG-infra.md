@@ -13,3 +13,7 @@
 - **Downloaded** `diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors` (20.5 GB, Comfy-Org) to replace the lightx2v Edit-2511 fp8 file, which ComfyUI cannot read (`weight_scale` keys, outputs noise). The unusable file was deleted with approval.
 - **Whisper** large-v3-turbo enabled (1.6 GB in `musicvid/data/models/whisper`, runs on CPU in the app container).
 - **Downloaded** for M3 (~49.5 GB, Comfy-Org, Apache-2.0): Wan 2.2 I2V 14B high/low fp8, lightx2v 4-step LoRAs, TI2V 5B fp16, umt5-xxl fp8 text encoder, wan_2.1 and wan2.2 VAEs; plus FILM `frame_interpolation/film_net_fp16.safetensors` (69 MB).
+
+## 2026-11-11
+- Downloaded `RealESRGAN_x2plus.pth` (64 MB, BSD-3, sha256 49fafd45…) to `ComfyUI/models/upscale_models/`. Tested in Final mode: clip time doubled (5 -> 10 min), sharper edges but waxier skin. Not used by the app; kept for later.
+- Added `deploy/comfyui.service` (local-only systemd unit for ComfyUI). Not installed yet; needs sudo.

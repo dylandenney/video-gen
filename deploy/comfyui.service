@@ -1,0 +1,14 @@
+[Unit]
+Description=ComfyUI (local only, used by musicvid)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ddenney
+WorkingDirectory=/home/ddenney/personal-github/ComfyUI
+ExecStart=/home/ddenney/personal-github/ComfyUI/venv/bin/python main.py --listen 127.0.0.1 --port 8188
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
