@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from . import jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
-from .jobs_io import write_json
+from .jobs_io import read_json, write_json
 from .stages.analyze import ffmpeg, song_overview
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -102,6 +102,56 @@ def rerun(job_id: str, stage: str, req: GenerateRequest) -> dict:
         raise HTTPException(400, "generate first")
     save_params(job_id, req)
     return jobs.enqueue(job_id, stage)
+
+
+class SceneEdit(BaseModel):
+    description: str
+    image_prompt: str
+    camera: str
+    motion: str
+    transition: Literal["cut", "crossfade", "flash", "fade_black"]
+    characters: list[str]
+
+
+@app.put("/api/jobs/{job_id}/scenes/{index}")
+def edit_scene(job_id: str, index: int, edit: SceneEdit) -> dict:
+    """Change one scene's text. Nothing is regenerated until /redo is called."""
+    job = get_job(job_id)
+    if job["status"] in ("queued", "running"):
+        raise HTTPException(409, "job is already running")
+    path = jobs.job_dir(job_id) / "storyboard.json"
+    board = read_json(path)
+    scene = next((s for s in board["scenes"] if s["index"] == index), None)
+    if scene is None:
+        raise HTTPException(404, "no such scene")
+    unknown = set(edit.characters) - {c["id"] for c in board["characters"]}
+    if unknown:
+        raise HTTPException(400, f"unknown characters: {', '.join(sorted(unknown))}")
+    scene.update(edit.model_dump())
+    write_json(path, board)
+    return scene
+
+
+class SceneRedo(BaseModel):
+    image: bool  # False = keep the keyframe, only make a new video clip
+
+
+@app.post("/api/jobs/{job_id}/scenes/{index}/redo")
+def redo_scene(job_id: str, index: int, req: SceneRedo) -> dict:
+    """New take of one scene (new seed), then reassemble the video."""
+    job = get_job(job_id)
+    if job["status"] in ("queued", "running"):
+        raise HTTPException(409, "job is already running")
+    if job["stages"].get("keyframes") != "done" and not req.image:
+        raise HTTPException(400, "this scene has no keyframe yet")
+    path = jobs.job_dir(job_id) / "storyboard.json"
+    board = read_json(path)
+    scene = next((s for s in board["scenes"] if s["index"] == index), None)
+    if scene is None:
+        raise HTTPException(404, "no such scene")
+    scene["seed"] += 1000
+    write_json(path, board)
+    return jobs.enqueue_scene(job_id, index, req.image)
 
 
 @app.get("/api/jobs/{job_id}/files/{name}")

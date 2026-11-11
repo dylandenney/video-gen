@@ -5,7 +5,7 @@ Motion modes (job param "motion"):
   draft  - Wan 2.2 TI2V 5B, 704x1280 @ 24 fps
   final  - Wan 2.2 I2V 14B + 4-step LoRAs, 720x1280 @ 16 fps, FILM-interpolated to 32 fps
 
-Clips are generated a little longer than their scene; assembly trims them to the cut.
+Clips are generated a little longer than their scene; assembly trims them.
 Writes clips/NN.mp4.
 """
 import math
@@ -30,23 +30,27 @@ def frames_for(seconds: float, fps: int) -> int:
     return 4 * math.ceil(seconds * fps / 4) + 1
 
 
+def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
+    """Animate one scene's keyframe into clips/NN.mp4."""
+    workflow, w, h, fps = MODES[mode]
+    image = comfy.upload_image(d / "keyframes" / f'{s["index"]:02d}.png')
+    prompt = f'{s["description"]} {s["motion"]}. Camera: {s["camera"]}. {board["visual_style"]}. Cinematic, natural motion.'
+    # Extra 0.6 s covers the longest transition overlap into the next scene (see assemble.TRANSITIONS).
+    length = frames_for(s["end"] - s["start"] + 0.6, fps)
+    comfy.run(comfy.fill(workflow, image=image, prompt=prompt, negative=NEGATIVE, width=w, height=h,
+                         length=length, seed=s["seed"]), d / "clips" / f'{s["index"]:02d}.mp4')
+
+
 def run(d: Path, job: dict) -> None:
     clips = d / "clips"
     shutil.rmtree(clips, ignore_errors=True)
     mode = job["params"].get("motion", "draft")
     if mode == "stills":
         return
-    workflow, w, h, fps = MODES[mode]
-
     board = read_json(d / "storyboard.json")
     clips.mkdir()
-    seed = int(job["id"][:8], 16)
     try:
         for s in board["scenes"]:
-            image = comfy.upload_image(d / "keyframes" / f'{s["index"]:02d}.png')
-            prompt = f'{s["description"]} {s["motion"]}. Camera: {s["camera"]}. {board["visual_style"]}. Cinematic, natural motion.'
-            comfy.run(comfy.fill(workflow, image=image, prompt=prompt, negative=NEGATIVE, width=w, height=h,
-                                 length=frames_for(s["end"] - s["start"], fps), seed=seed + s["index"]),
-                      clips / f'{s["index"]:02d}.mp4')
+            render_clip(d, board, s, mode)
     finally:
         comfy.free()

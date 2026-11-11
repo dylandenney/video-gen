@@ -9,7 +9,9 @@ import time
 import traceback
 import uuid
 from pathlib import Path
+from typing import Callable
 
+from .adapters import comfy
 from .config import JOBS_DIR
 from .jobs_io import read_json, write_json
 from .stages import analyze, lyrics, storyboard, keyframes, video, assemble
@@ -27,7 +29,7 @@ STAGES = {
 }
 
 _lock = threading.Lock()
-_queue: "queue.Queue[tuple[str, str]]" = queue.Queue()
+_queue: "queue.Queue[tuple[str, list]]" = queue.Queue()
 
 
 def job_dir(job_id: str) -> Path:
@@ -79,25 +81,54 @@ def list_jobs() -> list[dict]:
     return sorted(jobs, key=lambda j: j["created"], reverse=True)
 
 
-def enqueue(job_id: str, from_stage: str = "audio") -> dict:
-    names = list(STAGES)
-    start = names.index(from_stage)
+def _submit(job_id: str, steps: list[tuple[str, Callable]]) -> dict:
+    """Queue (stage name, fn(job_dir, job)) steps; the named stages show as pending until they run."""
     job = load(job_id)
-    stages = {n: (job["stages"].get(n, "pending") if i < start else "pending") for i, n in enumerate(names)}
+    pending = {name for name, _ in steps}
+    stages = {n: ("pending" if n in pending else job["stages"].get(n, "pending")) for n in STAGES}
     job = update(job_id, status="queued", stages=stages, error=None)
-    _queue.put((job_id, from_stage))
+    _queue.put((job_id, steps))
     return job
 
 
-def _run(job_id: str, from_stage: str) -> None:
+def enqueue(job_id: str, from_stage: str = "audio") -> dict:
     names = list(STAGES)
+    return _submit(job_id, [(n, STAGES[n]) for n in names[names.index(from_stage):]])
+
+
+def enqueue_scene(job_id: str, index: int, image: bool) -> dict:
+    """Redo one scene: optionally its keyframe, then its clip (unless in stills mode), then reassemble."""
+    def scene_of(d: Path) -> tuple[dict, dict]:
+        board = read_json(d / "storyboard.json")
+        return board, next(s for s in board["scenes"] if s["index"] == index)
+
+    def redo_image(d: Path, job: dict) -> None:
+        try:
+            keyframes.render_scene(d, *scene_of(d))
+        finally:
+            comfy.free()
+
+    def redo_clip(d: Path, job: dict) -> None:
+        if job["params"].get("motion", "draft") == "stills":
+            return
+        (d / "clips").mkdir(exist_ok=True)
+        try:
+            video.render_clip(d, *scene_of(d), job["params"]["motion"])
+        finally:
+            comfy.free()
+
+    steps = [("keyframes", redo_image)] if image else []
+    return _submit(job_id, steps + [("video", redo_clip), ("assemble", assemble.run)])
+
+
+def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
     update(job_id, status="running")
-    for name in names[names.index(from_stage):]:
+    for name, fn in steps:
         job = load(job_id)
         update(job_id, stages={**job["stages"], name: "running"})
         t0 = time.time()
         try:
-            STAGES[name](job_dir(job_id), job)
+            fn(job_dir(job_id), job)
         except Exception as e:
             log.error("job %s stage %s failed\n%s", job_id, name, traceback.format_exc())
             job = load(job_id)
@@ -111,8 +142,8 @@ def _run(job_id: str, from_stage: str) -> None:
 
 def _worker() -> None:
     while True:
-        job_id, from_stage = _queue.get()
-        _run(job_id, from_stage)
+        job_id, steps = _queue.get()
+        _run(job_id, steps)
 
 
 def start_worker() -> None:

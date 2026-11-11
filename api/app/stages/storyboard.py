@@ -183,7 +183,8 @@ def run(d: Path, job: dict) -> None:
 
     known = set(by_id)
     board["scenes"] = [
-        {**by_index[s["index"]], **s, "characters": [c for c in by_index[s["index"]]["characters"] if c in known]}
+        {**by_index[s["index"]], **s, "characters": [c for c in by_index[s["index"]]["characters"] if c in known],
+         "seed": int(job["id"][:8], 16) + s["index"]}  # scene edits bump this to get a new take
         for s in slots
     ]
     board["model"] = OLLAMA_MODEL

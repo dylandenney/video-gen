@@ -25,9 +25,18 @@ MOVES = [
 DEFAULT_MOVE = ("1+0.15*on/N", *CENTER)  # slow push-in
 
 
-def ken_burns(image: Path, scene: dict, out: Path) -> None:
-    """Animate a keyframe with a camera move picked from the scene's camera text (until M3 adds video)."""
-    n = max(1, round((scene["end"] - scene["start"]) * FPS))
+# Storyboard transition -> (ffmpeg xfade name, seconds). A "cut" is a one-frame fade so every join uses xfade.
+TRANSITIONS = {
+    "cut": ("fade", 1 / FPS),
+    "crossfade": ("fade", 0.4),
+    "flash": ("fadewhite", 0.25),
+    "fade_black": ("fadeblack", 0.6),
+}
+
+
+def ken_burns(image: Path, scene: dict, seconds: float, out: Path) -> None:
+    """Animate a keyframe with a camera move picked from the scene's camera text ("stills" mode)."""
+    n = max(1, round(seconds * FPS))
     cam = scene["camera"].lower()
     z, x, y = next((m for words, m in MOVES if any(w in cam for w in words)), DEFAULT_MOVE)
     z, x, y = (e.replace("N", str(n)) for e in (z, x, y))
@@ -37,9 +46,9 @@ def ken_burns(image: Path, scene: dict, out: Path) -> None:
            "-frames:v", str(n), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", str(out))
 
 
-def fit_clip(clip: Path, scene: dict, out: Path) -> None:
-    """Scale/crop a generated clip to the output size and cut it to exactly the scene's frame count."""
-    n = max(1, round((scene["end"] - scene["start"]) * FPS))
+def fit_clip(clip: Path, seconds: float, out: Path) -> None:
+    """Scale/crop a generated clip to the output size and cut it to an exact frame count."""
+    n = max(1, round(seconds * FPS))
     ffmpeg("-i", str(clip), "-an", "-vf",
            f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop={WIDTH}:{HEIGHT},"
            f"fps={FPS},tpad=stop_mode=clone:stop_duration=1",
@@ -50,23 +59,34 @@ def run(d: Path, job: dict) -> None:
     board = read_json(d / "storyboard.json")
     duration = read_json(d / "analysis.json")["duration"]
 
+    scenes = board["scenes"]
+    # The transition into scene i starts exactly on its cut, so scene i-1 runs that much longer underneath it.
+    overlaps = [TRANSITIONS[s["transition"]][1] for s in scenes[1:]] + [0.0]
+
     scenes_dir = d / "scenes"
     scenes_dir.mkdir(exist_ok=True)
-    parts = []
-    for s in board["scenes"]:
+    inputs = []
+    for s, extra in zip(scenes, overlaps):
         out = scenes_dir / f'{s["index"]:02d}.mp4'
+        seconds = s["end"] - s["start"] + extra
         clip = d / "clips" / f'{s["index"]:02d}.mp4'
         if clip.is_file():
-            fit_clip(clip, s, out)
+            fit_clip(clip, seconds, out)
         else:  # "stills" motion mode
-            ken_burns(d / "keyframes" / f'{s["index"]:02d}.png', s, out)
-        parts.append(out)
+            ken_burns(d / "keyframes" / f'{s["index"]:02d}.png', s, seconds, out)
+        inputs += ["-i", str(out)]
 
-    concat = d / "concat.txt"
-    concat.write_text("".join(f"file '{p}'\n" for p in parts))
+    # Common timebase and zero-based timestamps, or xfade emits out-of-order frames.
+    chain = [f"[{i}:v]settb=AVTB,setpts=PTS-STARTPTS,fps={FPS}[p{i}]" for i in range(len(scenes))]
+    last = "[p0]"
+    for i, s in enumerate(scenes[1:], 1):
+        kind, dur = TRANSITIONS[s["transition"]]
+        chain.append(f"{last}[p{i}]xfade=transition={kind}:duration={dur:.3f}:offset={s['start']:.3f}[x{i}]")
+        last = f"[x{i}]"
     fade = min(1.0, duration / 10)
-    ffmpeg("-f", "concat", "-safe", "0", "-i", str(concat), "-i", str(d / "clip.wav"),
-           "-vf", f"fade=in:d=0.3,fade=out:st={duration - fade:.3f}:d={fade:.3f}",
-           "-af", f"afade=out:st={duration - fade:.3f}:d={fade:.3f}",
+    chain.append(f"{last}fade=in:d=0.3,fade=out:st={duration - fade:.3f}:d={fade:.3f}[v]")
+    audio = len(scenes)
+    ffmpeg(*inputs, "-i", str(d / "clip.wav"), "-filter_complex", ";".join(chain),
+           "-map", "[v]", "-map", f"{audio}:a", "-af", f"afade=out:st={duration - fade:.3f}:d={fade:.3f}",
            "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(FPS),
            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", str(d / "final.mp4"))

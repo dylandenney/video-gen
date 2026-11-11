@@ -12,3 +12,4 @@
 - **ComfyUI** started with `--listen 127.0.0.1 --port 8188` (nohup, log `ComfyUI/comfyui.log`). Not a service yet; restart manually after reboot.
 - **Downloaded** `diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors` (20.5 GB, Comfy-Org) to replace the lightx2v Edit-2511 fp8 file, which ComfyUI cannot read (`weight_scale` keys, outputs noise). The unusable file was deleted with approval.
 - **Whisper** large-v3-turbo enabled (1.6 GB in `musicvid/data/models/whisper`, runs on CPU in the app container).
+- **Downloaded** for M3 (~49.5 GB, Comfy-Org, Apache-2.0): Wan 2.2 I2V 14B high/low fp8, lightx2v 4-step LoRAs, TI2V 5B fp16, umt5-xxl fp8 text encoder, wan_2.1 and wan2.2 VAEs; plus FILM `frame_interpolation/film_net_fp16.safetensors` (69 MB).

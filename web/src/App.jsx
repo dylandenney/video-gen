@@ -184,7 +184,8 @@ function Job({ id, onChange }) {
         </section>
       )}
 
-      {board && <Storyboard board={board} frames={frames} img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`} />}
+      {board && <Storyboard board={board} frames={frames} busy={busy} jobId={id} onJob={(j) => { setJob(j); onChange(); }} onBoard={setBoard}
+        img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`} />}
     </div>
   );
 }
@@ -236,8 +237,9 @@ function Cast({ job, disabled, onChange }) {
   );
 }
 
-function Storyboard({ board, frames, img }) {
+function Storyboard({ board, frames, img, busy, jobId, onJob, onBoard }) {
   const names = Object.fromEntries(board.characters.map((c) => [c.id, c.name]));
+  const saved = (scene) => onBoard({ ...board, scenes: board.scenes.map((s) => (s.index === scene.index ? scene : s)) });
   return (
     <section>
       <h3>Storyboard: {board.title}</h3>
@@ -256,16 +258,89 @@ function Storyboard({ board, frames, img }) {
       <h4>Scenes</h4>
       <div className="scenes">
         {board.scenes.map((s) => (
-          <article key={s.index}>
-            {frames?.scenes[s.index] && <img src={img(frames.scenes[s.index])} alt={`Scene ${s.index + 1}`} />}
-            <header>{s.index + 1} · {s.start.toFixed(1)}–{s.end.toFixed(1)}s · {s.emotion} · {s.transition}</header>
-            <p>{s.description}</p>
-            <p className="muted">{s.camera} — {s.motion}</p>
-            {s.characters.length > 0 && <p className="muted">With: {s.characters.map((c) => names[c] || c).join(", ")}</p>}
-            <details><summary>Image prompt</summary>{s.image_prompt}</details>
-          </article>
+          <Scene key={s.index} s={s} names={names} image={frames?.scenes[s.index] && img(frames.scenes[s.index])}
+            busy={busy} jobId={jobId} onJob={onJob} onSaved={saved} />
         ))}
       </div>
     </section>
+  );
+}
+
+const SCENE_FIELDS = ["description", "image_prompt", "camera", "motion", "transition", "characters"];
+
+function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
+  const [edit, setEdit] = useState(null);
+  const [error, setError] = useState("");
+  const pick = (scene) => Object.fromEntries(SCENE_FIELDS.map((k) => [k, scene[k]]));
+
+  async function call(fn) {
+    setError("");
+    try {
+      await fn();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+  const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const redo = (withImage) => call(async () => {
+    if (edit) {
+      onSaved(await api(`/jobs/${jobId}/scenes/${s.index}`, json("PUT", edit)));
+      setEdit(null);
+    }
+    onJob(await api(`/jobs/${jobId}/scenes/${s.index}/redo`, json("POST", { image: withImage })));
+  });
+  const field = (k, rows) => (
+    <label className="field">{k.replace("_", " ")}
+      <textarea rows={rows} value={edit[k]} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />
+    </label>
+  );
+
+  return (
+    <article>
+      {image && <img src={image} alt={`Scene ${s.index + 1}`} />}
+      <header>{s.index + 1} · {s.start.toFixed(1)}–{s.end.toFixed(1)}s · {s.emotion} · {s.transition}</header>
+      {edit ? (
+        <>
+          {field("description", 3)}
+          {field("image_prompt", 4)}
+          {field("camera", 1)}
+          {field("motion", 2)}
+          <label className="field">transition
+            <select value={edit.transition} onChange={(e) => setEdit({ ...edit, transition: e.target.value })}>
+              {["cut", "crossfade", "flash", "fade_black"].map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </label>
+          <div className="field">characters
+            {Object.entries(names).map(([id, name]) => (
+              <label key={id} className="check">
+                <input type="checkbox" checked={edit.characters.includes(id)}
+                  onChange={(e) => setEdit({ ...edit, characters: e.target.checked ? [...edit.characters, id] : edit.characters.filter((c) => c !== id) })} />
+                {name}
+              </label>
+            ))}
+          </div>
+          <p className="muted">Changing only the transition? Save and click "re-run from here" on Assemble video.</p>
+          <div className="row">
+            <button disabled={busy} onClick={() => call(async () => { onSaved(await api(`/jobs/${jobId}/scenes/${s.index}`, json("PUT", edit))); setEdit(null); })}>Save</button>
+            <button className="link" onClick={() => setEdit(null)}>cancel</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>{s.description}</p>
+          <p className="muted">{s.camera} — {s.motion}</p>
+          {s.characters.length > 0 && <p className="muted">With: {s.characters.map((c) => names[c] || c).join(", ")}</p>}
+          <details><summary>Image prompt</summary>{s.image_prompt}</details>
+        </>
+      )}
+      {!busy && (
+        <div className="row scene-actions">
+          {!edit && <button onClick={() => setEdit(pick(s))}>Edit</button>}
+          <button onClick={() => redo(true)} title="New keyframe, then a new clip">{edit ? "Save & redo" : "Redo"} image + clip</button>
+          {image && <button onClick={() => redo(false)} title="Keep the image, new video clip">{edit ? "Save & redo" : "Redo"} clip</button>}
+        </div>
+      )}
+      {error && <p className="error">{error}</p>}
+    </article>
   );
 }
