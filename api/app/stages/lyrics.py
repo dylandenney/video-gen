@@ -10,6 +10,8 @@ import re
 from difflib import SequenceMatcher
 from pathlib import Path
 
+import librosa
+
 from ..config import MODELS_DIR, WHISPER_MODEL
 from ..jobs_io import write_json
 
@@ -28,7 +30,8 @@ def transcribe(path: Path) -> list[dict]:
     from faster_whisper import WhisperModel  # optional; only loaded when enabled
 
     model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", download_root=str(MODELS_DIR / "whisper"))
-    segments, _ = model.transcribe(str(path), word_timestamps=True, vad_filter=True)
+    audio, _ = librosa.load(path, sr=16000, mono=True)
+    segments, _ = model.transcribe(audio, word_timestamps=True, vad_filter=True)
     return [{"w": norm(w.word), "start": w.start, "end": w.end} for s in segments for w in s.words if norm(w.word)]
 
 

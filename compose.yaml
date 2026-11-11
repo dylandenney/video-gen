@@ -10,7 +10,7 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-http://127.0.0.1:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:27b}
       COMFY_URL: ${COMFY_URL:-http://127.0.0.1:8188}
-      WHISPER_MODEL: ${WHISPER_MODEL:-}   # e.g. large-v3-turbo (~1.6 GB download on first use); empty = off
+      WHISPER_MODEL: ${WHISPER_MODEL-large-v3-turbo}  # ~1.6 GB, downloaded to data/models on first use; set empty to turn off
       OUTPUT_WIDTH: ${OUTPUT_WIDTH:-1080}
       OUTPUT_HEIGHT: ${OUTPUT_HEIGHT:-1920}
       OUTPUT_FPS: ${OUTPUT_FPS:-30}
