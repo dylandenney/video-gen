@@ -189,7 +189,7 @@ function Job({ id, onChange, onDeleted }) {
           <label>Motion{" "}
             <select value={form.motion} onChange={(e) => setForm({ ...form, motion: e.target.value })}>
               <option value="stills">Stills with camera moves (fastest)</option>
-              <option value="draft">Draft video (Wan 5B)</option>
+              <option value="draft">Draft video (Wan 5B, lower res, with lip sync)</option>
               <option value="final">Final video (Wan 14B, slowest)</option>
             </select>
           </label>
@@ -395,7 +395,7 @@ function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
           </div>
           <label className="check">
             <input type="checkbox" checked={!!edit.singing} onChange={(e) => setEdit({ ...edit, singing: e.target.checked })} />
-            Lip sync: the character sings this line to camera (Final mode, needs one character)
+            Lip sync: the character sings this line to camera (needs one character)
           </label>
           <p className="muted">Changing only the transition? Save and click "re-run from here" on Assemble video.</p>
           <div className="row">
