@@ -6,13 +6,10 @@ fixed slot, so the timing can't drift from the music.
 
 Writes storyboard.json.
 """
-import base64
-import json
 from pathlib import Path
 
-import httpx
-
-from ..config import OLLAMA_MODEL, OLLAMA_URL, VISION_MODEL
+from ..adapters import ollama
+from ..config import OLLAMA_MODEL, VISION_MODEL
 from ..jobs_io import read_json, write_json
 
 MIN_SHOT, TARGET_SHOT, MAX_SHOT = 2.5, 4.0, 5.0
@@ -81,6 +78,7 @@ SCHEMA = {
     },
 }
 
+
 SYSTEM = """You are a music-video director writing a storyboard for a vertical (9:16) short video.
 Rules:
 - Find the story and emotional arc in the lyrics and music. Support the feeling; don't illustrate every word literally.
@@ -96,18 +94,10 @@ Reply with JSON only."""
 
 def describe_photo(path: Path) -> str:
     """Appearance of the person in a cast photo, from the local vision model."""
-    r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=300, json={
-        "model": VISION_MODEL,
-        "messages": [{"role": "user", "images": [base64.b64encode(path.read_bytes()).decode()], "content": (
-            "Describe the main person in this photo for a film casting sheet, in one paragraph: apparent age range, "
-            "gender presentation, build, skin tone, face shape and features, eye color, hair color/length/style, facial hair, "
-            "and clothing. Visual facts only; do not guess who they are.")}],
-        "stream": False,
-        "keep_alive": 0,
-        "options": {"temperature": 0.2},
-    })
-    r.raise_for_status()
-    return r.json()["message"]["content"].strip()
+    return ollama.chat(VISION_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": (
+        "Describe the main person in this photo for a film casting sheet, in one paragraph: apparent age range, "
+        "gender presentation, build, skin tone, face shape and features, eye color, hair color/length/style, facial hair, "
+        "and clothing. Visual facts only; do not guess who they are.")}], temperature=0.2)
 
 
 def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cast: list[dict]) -> str:
@@ -147,17 +137,8 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
 
 
 def ask_llm(prompt: str) -> dict:
-    r = httpx.post(f"{OLLAMA_URL}/api/chat", timeout=900, json={
-        "model": OLLAMA_MODEL,
-        "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
-        "format": SCHEMA,
-        "stream": False,
-        "think": False,
-        "keep_alive": 0,  # unload right away so the GPU is free for image/video stages
-        "options": {"temperature": 0.7, "num_ctx": 8192},
-    })
-    r.raise_for_status()
-    return json.loads(r.json()["message"]["content"])
+    return ollama.chat(OLLAMA_MODEL, [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
+                       schema=SCHEMA, temperature=0.7, num_ctx=8192)
 
 
 def run(d: Path, job: dict) -> None:
