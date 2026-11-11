@@ -8,6 +8,16 @@ async function api(path, opts) {
   return r.json();
 }
 
+// Filled into the style notes, so they stay editable and reach the storyboard like typed notes.
+const STYLE_PRESETS = {
+  Cinematic: "cinematic film look, anamorphic lens, shallow depth of field, warm highlights and teal shadows, soft natural light",
+  "Film grain": "shot on 35mm film, visible grain, muted faded colors, soft halation, 1990s home-movie warmth",
+  "Golden hour": "golden hour sunlight, long warm shadows, lens flare, nostalgic and hopeful, small-town Southern setting",
+  "Neon night": "night city, neon signs glow in pink and blue, wet streets with reflections, moody high contrast",
+  "Black & white": "black and white photography, high contrast, deep shadows, timeless and intimate",
+  Anime: "hand-drawn anime style, clean line art, soft cel shading, painterly skies, vivid but gentle colors",
+  Dreamy: "dreamy soft focus, pastel colors, hazy backlight, floating dust in the light, slow and gentle",
+};
 const file = (id, name) => `/api/jobs/${id}/files/${name}`;
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 const when = (ts) => new Date(ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -163,6 +173,12 @@ function Job({ id, onChange, onDeleted }) {
         <h3>2. Lyrics and style</h3>
         <textarea rows={8} placeholder="Paste the lyrics from Suno (optional)" value={form.lyrics} onChange={(e) => setForm({ ...form, lyrics: e.target.value })} />
         <input type="text" placeholder="Style notes, e.g. nostalgic, golden hour, small-town Georgia" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} />
+        <div className="row">
+          <span className="muted">Presets:</span>
+          {Object.entries(STYLE_PRESETS).map(([label, text]) => (
+            <button key={label} title={text} onClick={() => setForm({ ...form, style: text })}>{label}</button>
+          ))}
+        </div>
       </section>
 
       <Cast job={job} disabled={busy} onChange={setJob} />

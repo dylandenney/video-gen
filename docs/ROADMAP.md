@@ -22,5 +22,5 @@
 3. [x] 16:9 horizontal output (Frame setting; YouTube export preset).
 4. Full-length songs (overnight batch).
 5. Lyric videos.
-6. Style presets.
+6. [x] Style presets (one-click style notes in the Lyrics and style step).
 7. Maintenance and extension documentation.
