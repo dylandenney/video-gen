@@ -63,7 +63,7 @@ SCHEMA = {
         }},
         "scenes": {"type": "array", "items": {
             "type": "object",
-            "required": ["index", "emotion", "description", "characters", "image_prompt", "camera", "motion", "transition"],
+            "required": ["index", "emotion", "description", "characters", "image_prompt", "camera", "motion", "transition", "singing"],
             "properties": {
                 "index": {"type": "integer"},
                 "emotion": {"type": "string"},
@@ -73,6 +73,7 @@ SCHEMA = {
                 "camera": {"type": "string"},
                 "motion": {"type": "string"},
                 "transition": {"type": "string", "enum": ["cut", "crossfade", "flash", "fade_black"]},
+                "singing": {"type": "boolean"},
             },
         }},
     },
@@ -87,6 +88,7 @@ Rules:
 - image_prompt: a single cinematic still for a 9:16 frame. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text; refer to characters by id in "characters".
 - Every image_prompt must be ONE physically real moment a camera could photograph. Never ask for people or images inside reflections, mirrors, glasses or eyes; ghosts; double exposures; overlays; split screens; visions; memories "in the mind"; or text and signs. Show memory and emotion through light, setting, props (an empty chair, an old photo on the dashboard) and expression instead.
 - camera: one camera move (e.g. slow push-in, orbit left, static, handheld drift). motion: what moves in the shot.
+- singing: true when one character performs the sung line to camera: a medium close-up or close-up, face toward the camera, mouth unobstructed. Only in slots where a line is sung, with exactly one character in the scene, and in at most a third of the scenes.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
 - One consistent visual_style and palette (3-5 hex colors) for the whole video.
 Reply with JSON only."""

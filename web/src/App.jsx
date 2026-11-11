@@ -293,7 +293,7 @@ function Storyboard({ board, frames, img, busy, jobId, onJob, onBoard }) {
   );
 }
 
-const SCENE_FIELDS = ["description", "image_prompt", "camera", "motion", "transition", "characters"];
+const SCENE_FIELDS = ["description", "image_prompt", "camera", "motion", "transition", "characters", "singing"];
 
 function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
   const [edit, setEdit] = useState(null);
@@ -346,6 +346,10 @@ function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
               </label>
             ))}
           </div>
+          <label className="check">
+            <input type="checkbox" checked={!!edit.singing} onChange={(e) => setEdit({ ...edit, singing: e.target.checked })} />
+            Lip sync: the character sings this line to camera (Final mode, needs one character)
+          </label>
           <p className="muted">Changing only the transition? Save and click "re-run from here" on Assemble video.</p>
           <div className="row">
             <button disabled={busy} onClick={() => call(async () => { onSaved(await api(`/jobs/${jobId}/scenes/${s.index}`, json("PUT", edit))); setEdit(null); })}>Save</button>
@@ -356,7 +360,7 @@ function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
         <>
           <p>{s.description}</p>
           <p className="muted">{s.camera} — {s.motion}</p>
-          {s.characters.length > 0 && <p className="muted">With: {s.characters.map((c) => names[c] || c).join(", ")}</p>}
+          {s.characters.length > 0 && <p className="muted">With: {s.characters.map((c) => names[c] || c).join(", ")}{s.singing && " · lip sync"}</p>}
           <details><summary>Image prompt</summary>{s.image_prompt}</details>
         </>
       )}

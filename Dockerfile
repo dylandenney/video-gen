@@ -10,8 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-de
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY api/requirements.txt ./
+# CPU-only PyTorch for Demucs vocal isolation; the GPU stays with ComfyUI.
+RUN pip install --no-cache-dir torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 COPY api/app ./app
 COPY --from=web /web/dist ./web
-ENV NUMBA_CACHE_DIR=/tmp/numba
+ENV NUMBA_CACHE_DIR=/tmp/numba TORCH_HOME=/data/models/torch
 CMD ["sh", "-c", "uvicorn app.main:app --host ${HOST:-127.0.0.1} --port ${PORT:-8090}"]

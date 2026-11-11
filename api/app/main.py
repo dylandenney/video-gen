@@ -121,6 +121,7 @@ class SceneEdit(BaseModel):
     motion: str
     transition: Literal["cut", "crossfade", "flash", "fade_black"]
     characters: list[str]
+    singing: bool = False
 
 
 @app.put("/api/jobs/{job_id}/scenes/{index}")

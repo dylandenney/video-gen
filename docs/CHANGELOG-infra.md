@@ -17,3 +17,5 @@
 ## 2026-11-11
 - Downloaded `RealESRGAN_x2plus.pth` (64 MB, BSD-3, sha256 49fafd45…) to `ComfyUI/models/upscale_models/`. Tested in Final mode: clip time doubled (5 -> 10 min), sharper edges but waxier skin. Not used by the app; kept for later.
 - Added `deploy/comfyui.service` (local-only systemd unit for ComfyUI). Not installed yet; needs sudo.
+- Lip sync (M5), approved: downloaded to `ComfyUI/models/` `diffusion_models/wan2.2_s2v_14B_fp8_scaled.safetensors` (16.4 GB, Apache-2.0), `audio_encoders/wav2vec2_large_english_fp16.safetensors` (0.63 GB, Apache-2.0), `loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors` (0.74 GB, Apache-2.0).
+- App image: added CPU-only `torch==2.5.1`/`torchaudio==2.5.1` and `demucs==4.0.1` for vocal isolation. `TORCH_HOME=/data/models/torch`; `htdemucs` weights (80 MB) downloaded there on first use. Licence note: code MIT, weights trained partly on research data; confirm before commercial use.

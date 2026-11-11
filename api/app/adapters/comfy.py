@@ -43,10 +43,11 @@ def fill(name: str, **values) -> dict:
     return graph
 
 
-def upload_image(path: Path) -> str:
-    """Upload a local image to ComfyUI's input folder and return its name for LoadImage."""
+def upload(path: Path, name: str | None = None) -> str:
+    """Upload a local image or audio file to ComfyUI's input folder and return its name for LoadImage/LoadAudio."""
     with path.open("rb") as f:
-        r = httpx.post(f"{COMFY_URL}/upload/image", files={"image": (path.name, f, "image/png")},
+        # ComfyUI stores any file sent to /upload/image; it is not image-only.
+        r = httpx.post(f"{COMFY_URL}/upload/image", files={"image": (name or path.name, f, "application/octet-stream")},
                        data={"subfolder": "musicvid", "overwrite": "true"}, timeout=60)
     r.raise_for_status()
     return f"musicvid/{r.json()['name']}"

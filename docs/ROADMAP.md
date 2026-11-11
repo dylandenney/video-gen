@@ -17,7 +17,7 @@
 - [x] Vision quality check on keyframes with automatic retakes
 
 ## M5 — bigger features (in order)
-1. **Lip sync** — Wan 2.2 S2V 14B on scenes the storyboard marks as singing on camera, driven by isolated vocals for that span.
+1. [x] **Lip sync** — Wan 2.2 S2V 14B on scenes the storyboard marks as singing on camera, driven by isolated vocals for that span.
 2. Automatic hook detection.
 3. 16:9 horizontal output.
 4. Full-length songs (overnight batch).

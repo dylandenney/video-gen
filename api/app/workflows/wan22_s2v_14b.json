@@ -1,0 +1,22 @@
+{
+  "unet": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan2.2_s2v_14B_fp8_scaled.safetensors", "weight_dtype": "default"}},
+  "lora": {"class_type": "LoraLoaderModelOnly", "inputs": {"model": ["unet", 0], "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors", "strength_model": 1.0}},
+  "shift": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["lora", 0], "shift": 8.0}},
+  "clip": {"class_type": "CLIPLoader", "inputs": {"clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan", "device": "default"}},
+  "vae": {"class_type": "VAELoader", "inputs": {"vae_name": "wan_2.1_vae.safetensors"}},
+  "audio_model": {"class_type": "AudioEncoderLoader", "inputs": {"audio_encoder_name": "wav2vec2_large_english_fp16.safetensors"}},
+  "audio": {"class_type": "LoadAudio", "inputs": {"audio": "$audio"}},
+  "audio_enc": {"class_type": "AudioEncoderEncode", "inputs": {"audio_encoder": ["audio_model", 0], "audio": ["audio", 0]}},
+  "load": {"class_type": "LoadImage", "inputs": {"image": "$image"}},
+  "pos": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["clip", 0], "text": "$prompt"}},
+  "neg": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["clip", 0], "text": "$negative"}},
+  "s2v": {"class_type": "WanSoundImageToVideo", "inputs": {"positive": ["pos", 0], "negative": ["neg", 0], "vae": ["vae", 0], "audio_encoder_output": ["audio_enc", 0],
+    "ref_image": ["load", 0], "width": "$width", "height": "$height", "length": "$length", "batch_size": 1}},
+  "sample": {"class_type": "KSampler", "inputs": {"model": ["shift", 0], "positive": ["s2v", 0], "negative": ["s2v", 1], "latent_image": ["s2v", 2],
+    "seed": "$seed", "steps": 4, "cfg": 1.0, "sampler_name": "uni_pc", "scheduler": "simple", "denoise": 1.0}},
+  "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sample", 0], "vae": ["vae", 0]}},
+  "interp_model": {"class_type": "FrameInterpolationModelLoader", "inputs": {"model_name": "film_net_fp16.safetensors"}},
+  "interp": {"class_type": "FrameInterpolate", "inputs": {"interp_model": ["interp_model", 0], "images": ["decode", 0], "multiplier": 2}},
+  "video": {"class_type": "CreateVideo", "inputs": {"images": ["interp", 0], "fps": 32}},
+  "save": {"class_type": "SaveVideo", "inputs": {"video": ["video", 0], "filename_prefix": "musicvid/wan_s2v", "format": "auto", "format.codec": "auto"}}
+}

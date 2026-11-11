@@ -3,7 +3,8 @@
 Motion modes (job param "motion"):
   stills - no video model; assembly animates the keyframes with camera moves
   draft  - Wan 2.2 TI2V 5B, 704x1280 @ 24 fps
-  final  - Wan 2.2 I2V 14B + 4-step LoRAs, 720x1280 @ 16 fps, FILM-interpolated to 32 fps
+  final  - Wan 2.2 I2V 14B + 4-step LoRAs, 720x1280 @ 16 fps, FILM-interpolated to 32 fps;
+           scenes marked "singing" use Wan 2.2 S2V 14B lip-synced to the isolated vocals
 
 Clips are generated a little longer than their scene; assembly trims them.
 Writes clips/NN.mp4.
@@ -11,6 +12,13 @@ Writes clips/NN.mp4.
 import math
 import shutil
 from pathlib import Path
+
+import librosa
+import numpy as np
+import soundfile as sf
+import torch
+from demucs.apply import apply_model
+from demucs.pretrained import get_model
 
 from ..adapters import comfy
 from ..jobs_io import read_json
@@ -30,20 +38,45 @@ def frames_for(seconds: float, fps: int) -> int:
     return 4 * math.ceil(seconds * fps / 4) + 1
 
 
+def isolate_vocals(d: Path) -> Path:
+    """vocals.wav: the singing from clip.wav, separated with Demucs on the CPU (about 15 s for a 20 s clip)."""
+    path = d / "vocals.wav"
+    if path.is_file():
+        return path
+    model = get_model("htdemucs")
+    y, _ = librosa.load(d / "clip.wav", sr=model.samplerate, mono=False)
+    y = np.atleast_2d(y)
+    if y.shape[0] == 1:
+        y = np.repeat(y, 2, 0)
+    with torch.no_grad():
+        stems = apply_model(model, torch.from_numpy(y)[None], device="cpu")[0]
+    sf.write(path, stems[model.sources.index("vocals")].numpy().T, model.samplerate)
+    return path
+
+
 def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
-    """Animate one scene's keyframe into clips/NN.mp4."""
+    """Animate one scene's keyframe into clips/NN.mp4. Final-mode singing scenes are lip-synced to the vocals."""
     workflow, w, h, fps = MODES[mode]
-    image = comfy.upload_image(d / "keyframes" / f'{s["index"]:02d}.png')
+    image = comfy.upload(d / "keyframes" / f'{s["index"]:02d}.png')
     prompt = f'{s["description"]} {s["motion"]}. Camera: {s["camera"]}. {board["visual_style"]}. Cinematic, natural motion.'
     # Extra 0.6 s covers the longest transition overlap into the next scene (see assemble.TRANSITIONS).
-    length = frames_for(s["end"] - s["start"] + 0.6, fps)
-    comfy.run(comfy.fill(workflow, image=image, prompt=prompt, negative=NEGATIVE, width=w, height=h,
-                         length=length, seed=s["seed"]), d / "clips" / f'{s["index"]:02d}.mp4')
+    seconds = s["end"] - s["start"] + 0.6
+    audio = None
+    if mode == "final" and s.get("singing") and s["characters"]:
+        workflow = "wan22_s2v_14b"
+        vocals, sr = sf.read(isolate_vocals(d))
+        part = d / "clips" / f'{s["index"]:02d}_vocals.wav'
+        sf.write(part, vocals[int(s["start"] * sr):int((s["start"] + seconds) * sr)], sr)
+        audio = comfy.upload(part)
+        prompt = f'The person sings these words with emotion, mouth clearly following the vocals. {prompt}'
+    comfy.run(comfy.fill(workflow, image=image, audio=audio, prompt=prompt, negative=NEGATIVE, width=w, height=h,
+                         length=frames_for(seconds, fps), seed=s["seed"]), d / "clips" / f'{s["index"]:02d}.mp4')
 
 
 def run(d: Path, job: dict) -> None:
     clips = d / "clips"
     shutil.rmtree(clips, ignore_errors=True)
+    (d / "vocals.wav").unlink(missing_ok=True)  # the audio clip may have changed
     mode = job["params"].get("motion", "draft")
     if mode == "stills":
         return

@@ -63,7 +63,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         who = "; ".join(f"{chars[cid]['name']} is the person in image {n + 1}" +
                         (f", dressed as described: {chars[cid]['appearance']}" if "photo" in chars[cid] else "")
                         for n, cid in enumerate(refs))
-        images = [comfy.upload_image(char_path(d, cid)) for cid in refs] + [None] * (3 - len(refs))
+        images = [comfy.upload(char_path(d, cid)) for cid in refs] + [None] * (3 - len(refs))
 
     for attempt in range(QC_ATTEMPTS):
         seed = s["seed"] + attempt * 100
