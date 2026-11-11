@@ -185,16 +185,16 @@ def export_presets() -> dict:
 
 
 @app.get("/api/jobs/{job_id}/export/{preset}")
-def export_video(job_id: str, preset: str, captions: bool = False):
-    """Download final.mp4 re-encoded for a platform, optionally with lyric captions."""
+def export_video(job_id: str, preset: str, text: str = "none"):
+    """Download final.mp4 re-encoded for a platform, optionally with lyric captions or as a lyric video."""
     job = get_job(job_id)
-    if preset not in export.PRESETS:
+    if preset not in export.PRESETS or text not in export.TEXT:
         raise HTTPException(404)
     d = jobs.job_dir(job_id)
     if not (d / "final.mp4").is_file():
         raise HTTPException(409, "the video is not finished yet")
-    out = export.build(d, preset, captions)
-    suffix = " captions" if captions else ""
+    out = export.build(d, preset, text)
+    suffix = f" {export.TEXT[text]}" if text != "none" else ""
     return FileResponse(out, filename=f'{job["title"]} - {export.PRESETS[preset]["label"]}{suffix}.mp4')
 
 

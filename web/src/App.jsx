@@ -232,10 +232,10 @@ function Export({ jobId, version }) {
   const [presets, setPresets] = useState({});
   const [preset, setPreset] = useState("tiktok");
   const [hasLyrics, setHasLyrics] = useState(false);
-  const [captions, setCaptions] = useState(false);
+  const [text, setText] = useState("none");
   useEffect(() => { fetch("/api/exports").then((r) => r.json()).then(setPresets); }, []);
   useEffect(() => {
-    fetch(file(jobId, "lyrics.json")).then((r) => r.json()).then((l) => { setHasLyrics(l.lines.length > 0); setCaptions(l.lines.length > 0); });
+    fetch(file(jobId, "lyrics.json")).then((r) => r.json()).then((l) => { setHasLyrics(l.lines.length > 0); setText(l.lines.length > 0 ? "captions" : "none"); });
   }, [jobId]);
   return (
     <div className="export">
@@ -243,8 +243,12 @@ function Export({ jobId, version }) {
       <select value={preset} onChange={(e) => setPreset(e.target.value)}>
         {Object.entries(presets).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
       </select>
-      <label><input type="checkbox" checked={captions} disabled={!hasLyrics} onChange={(e) => setCaptions(e.target.checked)} /> Lyric captions</label>
-      <a className="button" href={`/api/jobs/${jobId}/export/${preset}?captions=${captions}&v=${version}`} download>Download</a>
+      <select value={text} disabled={!hasLyrics} onChange={(e) => setText(e.target.value)}>
+        <option value="none">No lyrics</option>
+        <option value="captions">Lyric captions</option>
+        <option value="lyric">Lyric video (big centered words)</option>
+      </select>
+      <a className="button" href={`/api/jobs/${jobId}/export/${preset}?text=${text}&v=${version}`} download>Download</a>
       <p className="muted">Takes about 20 seconds the first time. Captions sit above each app's buttons; audio is leveled to -14 LUFS.</p>
     </div>
   );
