@@ -259,7 +259,10 @@ def add_library_cast(job_id: str, cid: str) -> dict:
         folder.mkdir(exist_ok=True)
         shutil.copyfile(characters.char_dir(cid) / "sheet.png", folder / photo)
 
-    return add_to_cast(job_id, c["name"], copy, c["appearance"])
+    look = c.get("look", "realistic")
+    # Tell the storyboard the drawing style so the video's look can match the character.
+    appearance = c["appearance"] + ("" if look == "realistic" else f" Drawn in {look} style.")
+    return add_to_cast(job_id, c["name"], copy, appearance)
 
 
 @app.delete("/api/jobs/{job_id}/cast/{cast_id}")
@@ -283,6 +286,7 @@ def get_character(cid: str) -> dict:
 class CharacterText(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     appearance: str = Field(min_length=1, max_length=2000)
+    look: Literal["realistic", "anime", "cartoon"] = "realistic"
 
 
 @app.get("/api/characters")
@@ -293,7 +297,7 @@ def list_characters() -> list[dict]:
 @app.post("/api/characters")
 def create_character(req: CharacterText) -> dict:
     """Generate a reference sheet from a description (about a minute; waits behind any running render)."""
-    return characters.create(req.name.strip(), req.appearance.strip())
+    return characters.create(req.name.strip(), req.appearance.strip(), req.look)
 
 
 @app.post("/api/characters/photo")
@@ -308,7 +312,7 @@ def redo_character(cid: str, req: CharacterText) -> dict:
     """Save edits; a generated character also gets a fresh take of its sheet."""
     if get_character(cid)["status"] not in ("ready", "failed"):
         raise HTTPException(409, "that character is still being made")
-    return characters.redo(cid, req.name.strip(), req.appearance.strip())
+    return characters.redo(cid, req.name.strip(), req.appearance.strip(), req.look)
 
 
 @app.post("/api/jobs/{job_id}/characters/{char_id}/save")

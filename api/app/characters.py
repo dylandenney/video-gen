@@ -69,17 +69,18 @@ def _in_background(c: dict, status: str, work) -> dict:
 
 
 def _render(c: dict) -> None:
-    comfy.run(keyframes.sheet_graph(c["name"], c["appearance"], random.randrange(2**31)), LIBRARY / c["id"] / "sheet.png")
+    comfy.run(keyframes.sheet_graph(c["name"], c["appearance"], random.randrange(2**31), c.get("look", "realistic")), LIBRARY / c["id"] / "sheet.png")
 
 
-def create(name: str, appearance: str) -> dict:
+def create(name: str, appearance: str, look: str) -> dict:
     c, _ = _new(name, appearance, "generated")
+    c["look"] = look
     return _in_background(c, "rendering", _render)
 
 
-def redo(cid: str, name: str, appearance: str) -> dict:
+def redo(cid: str, name: str, appearance: str, look: str) -> dict:
     """New take of a generated character, with any edits to its name or description."""
-    c = {**load(cid), "name": name, "appearance": appearance}
+    c = {**load(cid), "name": name, "appearance": appearance, "look": look}
     if c["source"] == "photo":
         return _save(c)  # a photo is the person; only the text changes
     return _in_background(c, "rendering", _render)

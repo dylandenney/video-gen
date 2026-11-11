@@ -54,11 +54,19 @@ def check(path: Path) -> list[str]:
     return [k for k, bad in result.items() if bad]
 
 
-def sheet_graph(name: str, appearance: str, seed: int) -> dict:
+LOOKS = {
+    "realistic": ("Character reference photo", "photorealistic, sharp focus"),
+    "anime": ("2D anime illustration, character reference sheet", "flat 2D anime art style like a TV anime, bold clean outlines, flat cel-shaded colors, large expressive anime eyes, simple shapes, not realistic, not 3D"),
+    "cartoon": ("3D cartoon character reference", "stylized 3D animated film style, soft rounded features, expressive eyes, not photorealistic"),
+}
+
+
+def sheet_graph(name: str, appearance: str, seed: int, look: str = "realistic") -> dict:
     """Workflow for a character reference sheet; also used by the character library."""
+    kind, finish = LOOKS[look]
     return comfy.fill("qwen_image_t2i", width=W, height=H, seed=seed, negative=NEGATIVE, prompt=(
-        f"Character reference photo of {name}: {appearance}. Full body, standing, facing the camera, "
-        f"neutral expression, plain light grey studio background, soft even light, photorealistic, sharp focus."))
+        f"{kind} of {name}: {appearance}. Full body, standing, facing the camera, "
+        f"neutral expression, plain light grey studio background, soft even light, {finish}."))
 
 
 def render_scene(d: Path, board: dict, s: dict) -> None:

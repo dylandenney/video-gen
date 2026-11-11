@@ -429,12 +429,13 @@ function SaveCharacter({ jobId, charId }) {
   return <button className="link" onClick={() => api(`/jobs/${jobId}/characters/${charId}/save`, { method: "POST" }).then(() => setSaved(true))}>save to library</button>;
 }
 
+const LOOK_OPTIONS = [["realistic", "Realistic"], ["anime", "Anime"], ["cartoon", "3D cartoon"]].map(([v, l]) => <option key={v} value={v}>{l}</option>);
 const sheet = (c) => `/api/characters/${c.id}/sheet.png?v=${c.updated}`;
 const BUSY = { rendering: "drawing…", describing: "reading photo…" };
 
 function Characters() {
   const [chars, setChars] = useState([]);
-  const [form, setForm] = useState({ name: "", appearance: "" });
+  const [form, setForm] = useState({ name: "", appearance: "", look: "realistic" });
   const [error, setError] = useState("");
   const refresh = () => api("/characters").then(setChars).catch(() => {});
   useEffect(() => { refresh(); }, []);
@@ -458,7 +459,7 @@ function Characters() {
     const body = new FormData();
     body.append("file", f);
     body.append("name", form.name);
-    act(() => api("/characters/photo", { method: "POST", body }).then(() => setForm({ name: "", appearance: "" })));
+    act(() => api("/characters/photo", { method: "POST", body }).then(() => setForm({ ...form, name: "", appearance: "" })));
   }
 
   return (
@@ -467,11 +468,12 @@ function Characters() {
       <section>
         <h3>New character</h3>
         <input type="text" placeholder="Name, e.g. June" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <select value={form.look} onChange={(e) => setForm({ ...form, look: e.target.value })}>{LOOK_OPTIONS}</select>
         <textarea rows={3} placeholder="Look: age, face, hair, build, clothes, colors. e.g. late-20s woman, auburn bob, freckles, denim jacket over a white tee"
           value={form.appearance} onChange={(e) => setForm({ ...form, appearance: e.target.value })} />
         <div className="row">
           <button className="primary" disabled={!form.name.trim() || !form.appearance.trim()}
-            onClick={() => act(() => api("/characters", json("POST", form)).then(() => setForm({ name: "", appearance: "" })))}>Create</button>
+            onClick={() => act(() => api("/characters", json("POST", form)).then(() => setForm({ ...form, name: "", appearance: "" })))}>Create</button>
           <label className="button">Or from a photo<input type="file" accept="image/*" onChange={photo} hidden /></label>
         </div>
         <p className="muted">A new picture takes about a minute, longer while a video is rendering. Photos stay on this machine; only use photos of people who agreed, and delete them if asked.</p>
@@ -494,6 +496,7 @@ function CharacterCard({ c, act, json }) {
       {edit ? (
         <>
           <input type="text" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+          {c.source !== "photo" && <select value={edit.look} onChange={(e) => setEdit({ ...edit, look: e.target.value })}>{LOOK_OPTIONS}</select>}
           <textarea rows={5} value={edit.appearance} onChange={(e) => setEdit({ ...edit, appearance: e.target.value })} />
           <div className="row">
             <button className="primary" onClick={() => act(() => api(`/characters/${c.id}`, json("PUT", edit)).then(() => setEdit(null)))}>
@@ -503,12 +506,12 @@ function CharacterCard({ c, act, json }) {
         </>
       ) : (
         <figcaption>
-          <b>{c.name}</b>{c.source === "photo" && " (photo)"}: {c.appearance}
+          <b>{c.name}</b>{c.source === "photo" ? " (photo)" : c.look && c.look !== "realistic" ? ` (${c.look})` : ""}: {c.appearance}
           {c.status === "failed" && <span className="error"> Failed: {c.error}</span>}
           {!busy && (
             <div className="row">
-              <button className="link" onClick={() => setEdit({ name: c.name, appearance: c.appearance })}>edit</button>
-              {c.source !== "photo" && <button className="link" onClick={() => act(() => api(`/characters/${c.id}`, json("PUT", { name: c.name, appearance: c.appearance })))}>new take</button>}
+              <button className="link" onClick={() => setEdit({ name: c.name, appearance: c.appearance, look: c.look || "realistic" })}>edit</button>
+              {c.source !== "photo" && <button className="link" onClick={() => act(() => api(`/characters/${c.id}`, json("PUT", { name: c.name, appearance: c.appearance, look: c.look || "realistic" })))}>new take</button>}
               <button className="link" onClick={() => confirm(`Delete ${c.name}?`) && act(() => api(`/characters/${c.id}`, { method: "DELETE" }))}>delete</button>
             </div>
           )}
