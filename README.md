@@ -9,7 +9,7 @@ Scenes are keyframes animated with camera moves; M3 replaces them with Wan video
 
 ```bash
 docker compose up -d --build
-# open http://127.0.0.1:8090  (from another computer: ssh -L 8090:127.0.0.1:8090 <spark>)
+# open http://<spark-ip>:8090 (LAN, no login; set HOST=127.0.0.1 to restrict to this machine)
 ```
 
 Logs: `docker compose logs -f api`. Job files: `data/jobs/<id>/`.
