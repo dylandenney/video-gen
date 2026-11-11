@@ -145,6 +145,17 @@ function Job({ id, onChange, onDeleted }) {
           <label>End (s) <input type="number" step="0.5" value={form.end} onChange={(e) => setForm({ ...form, end: +e.target.value })} /></label>
           <span className="muted">{len.toFixed(1)} s of {fmt(overview.duration)}</span>
         </div>
+        {overview.hooks?.length > 0 && (
+          <div className="row">
+            <span className="muted">Suggested hooks:</span>
+            {overview.hooks.map((h, n) => (
+              <button key={h.start} title="Most repeated and energetic parts of the song"
+                onClick={() => { setForm({ ...form, start: h.start, end: h.end }); if (audio.current) { audio.current.currentTime = h.start; audio.current.play(); } }}>
+                {n === 0 ? "★ " : ""}{fmt(h.start)}–{fmt(h.end)}
+              </button>
+            ))}
+          </div>
+        )}
         <audio ref={audio} controls src={file(id, "song")} />
       </section>
 
