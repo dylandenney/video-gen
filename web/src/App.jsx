@@ -85,7 +85,7 @@ function Job({ id, onChange, onDeleted }) {
   const [job, setJob] = useState(null);
   const [overview, setOverview] = useState(null);
   const [board, setBoard] = useState(null);
-  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", motion: "draft", aspect: "9:16" });
+  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", story: "", motion: "draft", aspect: "9:16" });
   const [error, setError] = useState("");
   const audio = useRef(null);
 
@@ -171,8 +171,9 @@ function Job({ id, onChange, onDeleted }) {
       </section>
 
       <section>
-        <h3>2. Lyrics and style</h3>
+        <h3>2. Lyrics, story and style</h3>
         <textarea rows={8} placeholder="Paste the lyrics from Suno (optional)" value={form.lyrics} onChange={(e) => setForm({ ...form, lyrics: e.target.value })} />
+        <textarea rows={3} placeholder="Story idea (optional). Leave empty to let the AI find a story in the lyrics. e.g. Two old friends drive to the coast; one is moving away. Ends at sunset on the beach." value={form.story || ""} onChange={(e) => setForm({ ...form, story: e.target.value })} />
         <input type="text" placeholder="Style notes, e.g. nostalgic, golden hour, small-town Georgia" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} />
         <div className="row">
           <span className="muted">Presets:</span>

@@ -85,6 +85,7 @@ SCHEMA = {
 SYSTEM = """You are a music-video director writing a storyboard for a short music video in the frame shape given.
 Rules:
 - Find the story and emotional arc in the lyrics and music. Support the feeling; don't illustrate every word literally.
+- If the user gives a story idea, build the storyboard around it: its characters, places and events come first, fitted to the music and slots. Keep the lyrics as emotional guidance.
 - Define each recurring character ONCE with a fixed, specific appearance (age, face, hair, build, clothing, colors). Reuse the exact same people across scenes.
 - Cast like a real casting director: give every invented character a distinctive, memorable look (exact age, skin tone and heritage, face shape, nose, brows, hair color and cut, one distinguishing feature). Avoid the stock look of "messy dark brown hair, light stubble, denim shirt over a white tee"; follow the casting nudge given.
 - Write exactly one scene per time slot given, with matching "index". Match the slot's energy: calm slots get slow camera moves, high-energy slots get bolder motion.
@@ -140,6 +141,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
     return "\n".join([
         f'Song: "{job["title"]}"',
         f'Style notes from the user: {p.get("style") or "none"}',
+        *([f'Story idea from the user (follow it; it overrides your own reading of the lyrics): {p["story"]}'] if p.get("story", "").strip() else []),
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
         f'Frame: {SHAPES[p.get("aspect", "9:16")]}.',
         "",

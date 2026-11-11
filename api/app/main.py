@@ -86,6 +86,7 @@ class GenerateRequest(BaseModel):
     end: float = Field(gt=0)
     lyrics: str = ""
     style: str = ""
+    story: str = Field("", max_length=4000)
     motion: Literal["stills", "draft", "final"] = "draft"
     aspect: Literal["9:16", "16:9"] = "9:16"
 
