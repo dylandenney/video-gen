@@ -42,3 +42,6 @@ video { max-height: 70vh; max-width: 100%; border-radius: 8px; background: #000;
 .scenes article { border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 14px; }
 .scenes header { font-weight: 600; margin-bottom: 6px; }
 .scenes p { margin: 4px 0; }
+.characters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.characters figure { margin: 0; font-size: 14px; }
+.characters img, .scenes img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; margin-bottom: 8px; display: block; }

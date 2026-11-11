@@ -2,8 +2,8 @@
 
 Local AI music-video generator for the DGX Spark. Upload a song, pick 20–30 s, get a beat-synced 9:16 MP4.
 
-**Status: M1.** Audio analysis, lyrics, LLM storyboard and FFmpeg assembly work end to end.
-Scenes are rendered as title cards; M2/M3 replace them with images and video from ComfyUI.
+**Status: M2.** Audio analysis, lyrics, LLM storyboard, character sheets + keyframes (Qwen-Image via ComfyUI) and FFmpeg assembly work end to end.
+Scenes are keyframes animated with camera moves; M3 replaces them with Wan video clips. ComfyUI must be running on 127.0.0.1:8188.
 
 ## Run
 

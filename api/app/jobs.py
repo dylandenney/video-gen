@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .config import JOBS_DIR
 from .jobs_io import read_json, write_json
-from .stages import analyze, lyrics, storyboard, assemble
+from .stages import analyze, lyrics, storyboard, keyframes, assemble
 
 log = logging.getLogger("musicvid.jobs")
 
@@ -21,6 +21,7 @@ STAGES = {
     "audio": analyze.run,
     "lyrics": lyrics.run,
     "storyboard": storyboard.run,
+    "keyframes": keyframes.run,
     "assemble": assemble.run,
 }
 
@@ -81,7 +82,7 @@ def enqueue(job_id: str, from_stage: str = "audio") -> dict:
     names = list(STAGES)
     start = names.index(from_stage)
     job = load(job_id)
-    stages = {n: (s if i < start else "pending") for i, (n, s) in enumerate(job["stages"].items())}
+    stages = {n: (job["stages"].get(n, "pending") if i < start else "pending") for i, n in enumerate(names)}
     job = update(job_id, status="queued", stages=stages, error=None)
     _queue.put((job_id, from_stage))
     return job

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-const STAGE_LABELS = { audio: "Audio analysis", lyrics: "Lyrics", storyboard: "Storyboard", assemble: "Assemble video" };
+const STAGE_LABELS = { audio: "Audio analysis", lyrics: "Lyrics", storyboard: "Storyboard", keyframes: "Characters & keyframes", assemble: "Assemble video" };
 
 async function api(path, opts) {
   const r = await fetch(`/api${path}`, opts);
@@ -100,6 +100,12 @@ function Job({ id, onChange }) {
     else setBoard(null);
   }, [id, job?.stages.storyboard]);
 
+  const [frames, setFrames] = useState(null);
+  useEffect(() => {
+    if (job?.stages.keyframes === "done") fetch(file(id, "keyframes.json")).then((r) => r.json()).then(setFrames);
+    else setFrames(null);
+  }, [id, job?.stages.keyframes, job?.updated]);
+
   if (!job || !overview) return <p className="muted">Loading…</p>;
 
   async function run(path, body) {
@@ -166,12 +172,12 @@ function Job({ id, onChange }) {
         </section>
       )}
 
-      {board && <Storyboard board={board} />}
+      {board && <Storyboard board={board} frames={frames} img={(name) => `/api/jobs/${id}/keyframes/${name}?v=${job.updated}`} />}
     </div>
   );
 }
 
-function Storyboard({ board }) {
+function Storyboard({ board, frames, img }) {
   const names = Object.fromEntries(board.characters.map((c) => [c.id, c.name]));
   return (
     <section>
@@ -180,11 +186,19 @@ function Storyboard({ board }) {
       <p className="muted">Style: {board.visual_style}</p>
       <div className="palette">{board.palette.map((c) => <span key={c} style={{ background: c }} title={c} />)}</div>
       <h4>Characters</h4>
-      <ul>{board.characters.map((c) => <li key={c.id}><b>{c.name}</b>: {c.appearance}</li>)}</ul>
+      <div className="characters">
+        {board.characters.map((c) => (
+          <figure key={c.id}>
+            {frames?.characters[c.id] && <img src={img(frames.characters[c.id])} alt={c.name} />}
+            <figcaption><b>{c.name}</b>: {c.appearance}</figcaption>
+          </figure>
+        ))}
+      </div>
       <h4>Scenes</h4>
       <div className="scenes">
         {board.scenes.map((s) => (
           <article key={s.index}>
+            {frames?.scenes[s.index] && <img src={img(frames.scenes[s.index])} alt={`Scene ${s.index + 1}`} />}
             <header>{s.index + 1} · {s.start.toFixed(1)}–{s.end.toFixed(1)}s · {s.emotion} · {s.transition}</header>
             <p>{s.description}</p>
             <p className="muted">{s.camera} — {s.motion}</p>

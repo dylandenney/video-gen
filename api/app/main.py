@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 app = FastAPI(title="musicvid")
 
 # Only these files may be fetched from a job folder.
-PUBLIC_FILES = {"clip.wav", "overview.json", "analysis.json", "lyrics.json", "storyboard.json", "final.mp4"}
+PUBLIC_FILES = {"clip.wav", "overview.json", "analysis.json", "lyrics.json", "storyboard.json", "keyframes.json", "final.mp4"}
 
 
 @app.on_event("startup")
@@ -108,6 +108,16 @@ def job_file(job_id: str, name: str):
     if not path.is_file():
         raise HTTPException(404)
     return FileResponse(path, filename=f'{job["title"]}.mp4' if name == "final.mp4" else None)
+
+
+@app.get("/api/jobs/{job_id}/keyframes/{name}")
+def keyframe(job_id: str, name: str):
+    get_job(job_id)
+    folder = jobs.job_dir(job_id) / "keyframes"
+    path = (folder / name).resolve()
+    if path.parent != folder.resolve() or path.suffix != ".png" or not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path)
 
 
 if WEB_DIR.is_dir():
