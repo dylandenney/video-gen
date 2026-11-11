@@ -1,5 +1,6 @@
 import logging
 import subprocess
+import uuid
 
 import httpx
 from fastapi import FastAPI, Form, HTTPException, UploadFile
@@ -134,16 +135,17 @@ async def add_cast(job_id: str, file: UploadFile, name: str = Form(...)) -> dict
     folder = jobs.job_dir(job_id) / "cast"
     folder.mkdir(exist_ok=True)
     raw = folder / f"upload_{n}"
+    photo = f"cast_{n}_{uuid.uuid4().hex[:8]}.png"  # unique name so browsers never show a removed photo
     raw.write_bytes(await file.read())
     try:
         # Normalize to PNG, at most 1536 px on the long side.
         ffmpeg("-i", str(raw), "-vf", "scale=w='min(1536,iw)':h='min(1536,ih)':force_original_aspect_ratio=decrease",
-               "-frames:v", "1", str(folder / f"cast_{n}.png"))
+               "-frames:v", "1", str(folder / photo))
     except subprocess.CalledProcessError:
         raise HTTPException(400, "could not read that image")
     finally:
         raw.unlink()
-    entry = {"id": f"cast_{n}", "name": name.strip() or f"Person {n}", "photo": f"cast_{n}.png"}
+    entry = {"id": f"cast_{n}", "name": name.strip() or f"Person {n}", "photo": photo}
     return jobs.update(job_id, cast=[*cast, entry])
 
 
@@ -151,11 +153,11 @@ async def add_cast(job_id: str, file: UploadFile, name: str = Form(...)) -> dict
 def remove_cast(job_id: str, cast_id: str) -> dict:
     job = get_job(job_id)
     cast = job.get("cast", [])
-    keep = [c for c in cast if c["id"] != cast_id]
-    if len(keep) == len(cast):
+    entry = next((c for c in cast if c["id"] == cast_id), None)
+    if entry is None:
         raise HTTPException(404)
-    (jobs.job_dir(job_id) / "cast" / f"{cast_id}.png").unlink(missing_ok=True)
-    return jobs.update(job_id, cast=keep)
+    (jobs.job_dir(job_id) / "cast" / entry["photo"]).unlink(missing_ok=True)
+    return jobs.update(job_id, cast=[c for c in cast if c is not entry])
 
 
 if WEB_DIR.is_dir():
