@@ -17,6 +17,11 @@ WIDTH = int(os.environ.get("OUTPUT_WIDTH", "1080"))
 HEIGHT = int(os.environ.get("OUTPUT_HEIGHT", "1920"))
 FPS = int(os.environ.get("OUTPUT_FPS", "30"))
 
+
+def oriented(w: int, h: int, aspect: str) -> tuple[int, int]:
+    """A portrait (w, h) size turned to match the storyboard's aspect ("9:16" or "16:9")."""
+    return (h, w) if aspect == "16:9" else (w, h)
+
 WEB_DIR = Path(os.environ.get("WEB_DIR", "/app/web"))
 
 JOBS_DIR.mkdir(parents=True, exist_ok=True)

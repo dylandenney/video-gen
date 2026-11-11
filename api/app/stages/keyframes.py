@@ -14,11 +14,12 @@ import shutil
 from pathlib import Path
 
 from ..adapters import comfy, ollama
-from ..config import VISION_MODEL
+from ..config import VISION_MODEL, oriented
 from ..jobs_io import read_json, write_json
 
-# 9:16 size Qwen-Image was trained on; assembly scales it to the output size.
+# 9:16 size Qwen-Image was trained on (turned for 16:9); assembly scales it to the output size.
 W, H = 928, 1664
+COMPOSITION = {"9:16": "vertical 9:16 composition", "16:9": "horizontal 16:9 widescreen composition"}
 NEGATIVE = "low resolution, blurry, deformed hands, extra fingers, distorted face, oversaturated, waxy skin, text, watermark, logo"
 QC_ATTEMPTS = 3  # first take + up to two retries when the vision check finds defects
 
@@ -56,6 +57,8 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     """Draw one scene's keyframe (keyframes/NN.png), retrying with new seeds while the quality check finds defects."""
     path = d / "keyframes" / f'{s["index"]:02d}.png'
     style = board["visual_style"]
+    aspect = board.get("aspect", "9:16")
+    w, h = oriented(W, H, aspect)
     refs = s["characters"][:3]
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
@@ -68,14 +71,14 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     for attempt in range(QC_ATTEMPTS):
         seed = s["seed"] + attempt * 100
         if refs:
-            graph = comfy.fill("qwen_image_edit", width=W, height=H, seed=seed,
+            graph = comfy.fill("qwen_image_edit", width=w, height=h, seed=seed,
                                image1=images[0], image2=images[1], image3=images[2], prompt=(
-                f'Create a new cinematic film still, vertical 9:16 composition: {s["image_prompt"]} {who}. '
+                f'Create a new cinematic film still, {COMPOSITION[aspect]}: {s["image_prompt"]} {who}. '
                 f"Keep each person's face, hair and body exactly as in their reference image; "
                 f"do not copy the background of the reference images. {style}."))
         else:
-            graph = comfy.fill("qwen_image_t2i", width=W, height=H, seed=seed, negative=NEGATIVE,
-                               prompt=f'{s["image_prompt"]}. {style}. Cinematic film still, vertical composition.')
+            graph = comfy.fill("qwen_image_t2i", width=w, height=h, seed=seed, negative=NEGATIVE,
+                               prompt=f'{s["image_prompt"]}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
         comfy.run(graph, path)
         problems = check(path)
         if not problems:

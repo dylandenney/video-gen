@@ -21,12 +21,13 @@ from demucs.apply import apply_model
 from demucs.pretrained import get_model
 
 from ..adapters import comfy
+from ..config import oriented
 from ..jobs_io import read_json
 
 NEGATIVE = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，"
             "多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走")
 
-# workflow, width, height, model fps
+# workflow, width, height (portrait; swapped for 16:9), model fps
 MODES = {
     "draft": ("wan22_ti2v_5b", 704, 1280, 24),
     "final": ("wan22_i2v_14b", 720, 1280, 16),
@@ -57,6 +58,7 @@ def isolate_vocals(d: Path) -> Path:
 def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
     """Animate one scene's keyframe into clips/NN.mp4. Final-mode singing scenes are lip-synced to the vocals."""
     workflow, w, h, fps = MODES[mode]
+    w, h = oriented(w, h, board.get("aspect", "9:16"))
     image = comfy.upload(d / "keyframes" / f'{s["index"]:02d}.png')
     prompt = f'{s["description"]} {s["motion"]}. Camera: {s["camera"]}. {board["visual_style"]}. Cinematic, natural motion.'
     # Extra 0.6 s covers the longest transition overlap into the next scene (see assemble.TRANSITIONS).

@@ -19,7 +19,7 @@
 ## M5 — bigger features (in order)
 1. [x] **Lip sync** — Wan 2.2 S2V 14B on scenes the storyboard marks as singing on camera, driven by isolated vocals for that span.
 2. [x] Automatic hook detection (top 3 suggestions in the range picker).
-3. 16:9 horizontal output.
+3. [x] 16:9 horizontal output (Frame setting; YouTube export preset).
 4. Full-length songs (overnight batch).
 5. Lyric videos.
 6. Style presets.

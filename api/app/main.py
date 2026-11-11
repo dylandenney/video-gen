@@ -86,6 +86,7 @@ class GenerateRequest(BaseModel):
     lyrics: str = ""
     style: str = ""
     motion: Literal["stills", "draft", "final"] = "draft"
+    aspect: Literal["9:16", "16:9"] = "9:16"
 
 
 def save_params(job_id: str, req: GenerateRequest) -> None:

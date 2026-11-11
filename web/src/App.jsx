@@ -74,7 +74,7 @@ function Job({ id, onChange, onDeleted }) {
   const [job, setJob] = useState(null);
   const [overview, setOverview] = useState(null);
   const [board, setBoard] = useState(null);
-  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", motion: "draft" });
+  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", motion: "draft", aspect: "9:16" });
   const [error, setError] = useState("");
   const audio = useRef(null);
 
@@ -84,7 +84,7 @@ function Job({ id, onChange, onDeleted }) {
     setError("");
     api(`/jobs/${id}`).then((j) => {
       setJob(j);
-      if (j.params.start !== undefined) setForm({ motion: "draft", ...j.params });
+      if (j.params.start !== undefined) setForm({ motion: "draft", aspect: "9:16", ...j.params });
     });
     fetch(file(id, "overview.json")).then((r) => r.json()).then(setOverview);
   }, [id]);
@@ -176,9 +176,15 @@ function Job({ id, onChange, onDeleted }) {
               <option value="final">Final video (Wan 14B, slowest)</option>
             </select>
           </label>
+          <label>Frame{" "}
+            <select value={form.aspect} onChange={(e) => setForm({ ...form, aspect: e.target.value })}>
+              <option value="9:16">9:16 vertical (phones)</option>
+              <option value="16:9">16:9 horizontal (YouTube, TV)</option>
+            </select>
+          </label>
           <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
         </div>
-        <p className="muted">Tip: to try a different motion setting, change it and click "re-run from here" on Video clips.</p>
+        <p className="muted">Tip: to try a different motion setting, change it and click "re-run from here" on Video clips. A new frame shape needs a re-run from Storyboard.</p>
         {error && <p className="error">{error}</p>}
         {job.error && <p className="error">Failed at {job.error}</p>}
         <ol className="stages">

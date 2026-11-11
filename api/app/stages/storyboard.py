@@ -13,6 +13,7 @@ from ..config import OLLAMA_MODEL, VISION_MODEL
 from ..jobs_io import read_json, write_json
 
 MIN_SHOT, TARGET_SHOT, MAX_SHOT = 2.5, 4.0, 5.0
+SHAPES = {"9:16": "vertical 9:16, for phones", "16:9": "horizontal 16:9 widescreen"}
 
 
 def plan_slots(analysis: dict, lyrics: dict) -> list[dict]:
@@ -80,12 +81,12 @@ SCHEMA = {
 }
 
 
-SYSTEM = """You are a music-video director writing a storyboard for a vertical (9:16) short video.
+SYSTEM = """You are a music-video director writing a storyboard for a short music video in the frame shape given.
 Rules:
 - Find the story and emotional arc in the lyrics and music. Support the feeling; don't illustrate every word literally.
 - Define each recurring character ONCE with a fixed, specific appearance (age, face, hair, build, clothing, colors). Reuse the exact same people across scenes.
 - Write exactly one scene per time slot given, with matching "index". Match the slot's energy: calm slots get slow camera moves, high-energy slots get bolder motion.
-- image_prompt: a single cinematic still for a 9:16 frame. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text; refer to characters by id in "characters".
+- image_prompt: a single cinematic still composed for that frame shape. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text; refer to characters by id in "characters".
 - Every image_prompt must be ONE physically real moment a camera could photograph. Never ask for people or images inside reflections, mirrors, glasses or eyes; ghosts; double exposures; overlays; split screens; visions; memories "in the mind"; or text and signs. Show memory and emotion through light, setting, props (an empty chair, an old photo on the dashboard) and expression instead.
 - camera: one camera move (e.g. slow push-in, orbit left, static, handheld drift). motion: what moves in the shot.
 - singing: true when one character performs the sung line to camera: a medium close-up or close-up, face toward the camera, mouth unobstructed. Only in slots where a line is sung, with exactly one character in the scene, and in at most a third of the scenes.
@@ -125,6 +126,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         f'Song: "{job["title"]}"',
         f'Style notes from the user: {p.get("style") or "none"}',
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
+        f'Frame: {SHAPES[p.get("aspect", "9:16")]}.',
         "",
         "Full song lyrics (the story and genre come from these; a first line may list the genre):" if full
         else "No lyrics provided (instrumental or unknown).",
@@ -172,4 +174,5 @@ def run(d: Path, job: dict) -> None:
         for s in slots
     ]
     board["model"] = OLLAMA_MODEL
+    board["aspect"] = job["params"].get("aspect", "9:16")  # later stages size everything from this
     write_json(d / "storyboard.json", board)

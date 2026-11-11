@@ -7,7 +7,7 @@ Writes scenes/NN.mp4 and final.mp4.
 """
 from pathlib import Path
 
-from ..config import FPS, HEIGHT, WIDTH
+from ..config import FPS, HEIGHT, WIDTH, oriented
 from ..jobs_io import read_json
 from .analyze import ffmpeg
 
@@ -34,23 +34,25 @@ TRANSITIONS = {
 }
 
 
-def ken_burns(image: Path, scene: dict, seconds: float, out: Path) -> None:
+def ken_burns(image: Path, scene: dict, seconds: float, size: tuple[int, int], out: Path) -> None:
     """Animate a keyframe with a camera move picked from the scene's camera text ("stills" mode)."""
     n = max(1, round(seconds * FPS))
+    w, h = size
     cam = scene["camera"].lower()
     z, x, y = next((m for words, m in MOVES if any(w in cam for w in words)), DEFAULT_MOVE)
     z, x, y = (e.replace("N", str(n)) for e in (z, x, y))
     # Upscale 2x first so slow moves don't jitter.
     ffmpeg("-i", str(image), "-vf",
-           f"scale={WIDTH * 2}:{HEIGHT * 2}:flags=lanczos,zoompan=z='{z}':x='{x}':y='{y}':d={n}:s={WIDTH}x{HEIGHT}:fps={FPS}",
+           f"scale={w * 2}:{h * 2}:flags=lanczos,zoompan=z='{z}':x='{x}':y='{y}':d={n}:s={w}x{h}:fps={FPS}",
            "-frames:v", str(n), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", str(out))
 
 
-def fit_clip(clip: Path, seconds: float, out: Path) -> None:
+def fit_clip(clip: Path, seconds: float, size: tuple[int, int], out: Path) -> None:
     """Scale/crop a generated clip to the output size and cut it to an exact frame count."""
     n = max(1, round(seconds * FPS))
+    w, h = size
     ffmpeg("-i", str(clip), "-an", "-vf",
-           f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase:flags=lanczos,crop={WIDTH}:{HEIGHT},"
+           f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,crop={w}:{h},"
            f"fps={FPS},tpad=stop_mode=clone:stop_duration=1",
            "-frames:v", str(n), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", str(out))
 
@@ -60,6 +62,7 @@ def run(d: Path, job: dict) -> None:
     duration = read_json(d / "analysis.json")["duration"]
 
     scenes = board["scenes"]
+    size = oriented(WIDTH, HEIGHT, board.get("aspect", "9:16"))
     # The transition into scene i starts exactly on its cut, so scene i-1 runs that much longer underneath it.
     overlaps = [TRANSITIONS[s["transition"]][1] for s in scenes[1:]] + [0.0]
 
@@ -71,9 +74,9 @@ def run(d: Path, job: dict) -> None:
         seconds = s["end"] - s["start"] + extra
         clip = d / "clips" / f'{s["index"]:02d}.mp4'
         if clip.is_file():
-            fit_clip(clip, seconds, out)
+            fit_clip(clip, seconds, size, out)
         else:  # "stills" motion mode
-            ken_burns(d / "keyframes" / f'{s["index"]:02d}.png', s, seconds, out)
+            ken_burns(d / "keyframes" / f'{s["index"]:02d}.png', s, seconds, size, out)
         inputs += ["-i", str(out)]
 
     # Common timebase and zero-based timestamps, or xfade emits out-of-order frames.
