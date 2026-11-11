@@ -1,4 +1,5 @@
 import logging
+import shutil
 import subprocess
 import uuid
 from typing import Literal
@@ -68,6 +69,15 @@ async def upload(file: UploadFile) -> dict:
 @app.get("/api/jobs/{job_id}")
 def job_status(job_id: str) -> dict:
     return get_job(job_id)
+
+
+@app.delete("/api/jobs/{job_id}")
+def delete_job(job_id: str) -> dict:
+    """Delete a job and all its files (song, photos, images, videos)."""
+    if get_job(job_id)["status"] in ("queued", "running"):
+        raise HTTPException(409, "job is running; wait for it to finish")
+    shutil.rmtree(jobs.job_dir(job_id))
+    return {"deleted": job_id}
 
 
 class GenerateRequest(BaseModel):

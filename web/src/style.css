@@ -54,3 +54,6 @@ select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radi
 .check { display: inline-flex; gap: 4px; align-items: center; margin-right: 12px; color: var(--text); }
 .scene-actions { margin: 8px 0 0; gap: 6px; }
 .scene-actions button { padding: 4px 10px; font-size: 13px; }
+.jobs li span small.when { display: block; font-size: 12px; color: var(--muted); }
+.job-head { justify-content: space-between; } .job-head h2 { margin: 0; }
+button.link.danger { color: var(--bad); }

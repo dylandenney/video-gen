@@ -10,6 +10,7 @@ async function api(path, opts) {
 
 const file = (id, name) => `/api/jobs/${id}/files/${name}`;
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const when = (ts) => new Date(ts * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default function App() {
   const [jobs, setJobs] = useState([]);
@@ -51,7 +52,7 @@ export default function App() {
         <ul className="jobs">
           {jobs.map((j) => (
             <li key={j.id} className={j.id === current ? "active" : ""} onClick={() => setCurrent(j.id)}>
-              <span>{j.title}</span>
+              <span>{j.title}<small className="when">{when(j.created)}{j.params.motion ? ` · ${j.params.motion}` : ""}</small></span>
               <small className={`status ${j.status}`}>{j.status}</small>
             </li>
           ))}
@@ -64,12 +65,12 @@ export default function App() {
           </p>
         )}
       </aside>
-      <main>{current ? <Job id={current} onChange={refreshJobs} /> : <p className="muted">Upload a song to start.</p>}</main>
+      <main>{current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
     </div>
   );
 }
 
-function Job({ id, onChange }) {
+function Job({ id, onChange, onDeleted }) {
   const [job, setJob] = useState(null);
   const [overview, setOverview] = useState(null);
   const [board, setBoard] = useState(null);
@@ -126,7 +127,10 @@ function Job({ id, onChange }) {
 
   return (
     <div className="job">
-      <h2>{job.title}</h2>
+      <div className="row job-head">
+        <h2>{job.title}</h2>
+        {!busy && <button className="link danger" onClick={() => confirm(`Delete "${job.title}" and all its files?`) && api(`/jobs/${id}`, { method: "DELETE" }).then(onDeleted, (e) => setError(e.message))}>delete job</button>}
+      </div>
       <section>
         <h3>1. Pick the section</h3>
         <div className="energy" title="Click to set the start">
