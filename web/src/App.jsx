@@ -58,7 +58,7 @@ export default function App() {
         <h1>Music Video Studio</h1>
         <label className="button primary">
           Upload song
-          <input type="file" accept="audio/*" onChange={upload} hidden />
+          <input type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg" onChange={upload} hidden />
         </label>
         <button className={current === "characters" ? "active" : ""} onClick={() => setCurrent("characters")}>Characters</button>
         {error && <p className="error">{error}</p>}
