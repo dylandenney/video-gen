@@ -79,6 +79,12 @@ def run_estimate(job_id: str, start: float, end: float, motion: Literal["stills"
     return jobs.estimate(get_job(job_id), {"start": start, "end": end, "motion": motion})
 
 
+@app.post("/api/jobs/{job_id}/stop")
+def stop_job(job_id: str) -> dict:
+    get_job(job_id)
+    return jobs.stop(job_id)
+
+
 @app.delete("/api/jobs/{job_id}")
 def delete_job(job_id: str) -> dict:
     """Delete a job and all its files (song, photos, images, videos)."""

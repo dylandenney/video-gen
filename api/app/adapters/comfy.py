@@ -83,3 +83,8 @@ def run(graph: dict, out: Path, timeout: float = 1800) -> Path:
 def free() -> None:
     """Ask ComfyUI to unload models so the next stage has the memory."""
     httpx.post(f"{COMFY_URL}/free", json={"unload_models": True, "free_memory": True}, timeout=30)
+
+
+def interrupt() -> None:
+    """Stop the prompt ComfyUI is running now; the waiting run() call then raises."""
+    httpx.post(f"{COMFY_URL}/interrupt", timeout=30)

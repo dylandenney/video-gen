@@ -210,6 +210,7 @@ function Job({ id, onChange, onDeleted }) {
             </select>
           </label>
           <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
+          {busy && <button onClick={() => confirm("Stop this run? Finished steps are kept.") && run(`/jobs/${id}/stop`)}>Stop</button>}
         </div>
         {!busy && plan && <p className="muted">A full run takes about {minutes(plan.minutes_left)} with nothing else running.</p>}
         {busy && job.eta && (

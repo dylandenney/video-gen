@@ -29,7 +29,8 @@ STAGES = {
 }
 
 _lock = threading.Lock()
-_queue: "queue.Queue[tuple[str, list]]" = queue.Queue()
+_queue: "queue.Queue[tuple[str, str, list]]" = queue.Queue()  # (job id, run id, steps)
+_stopping: set[str] = set()  # running jobs asked to stop
 
 
 def job_dir(job_id: str) -> Path:
@@ -86,9 +87,10 @@ def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = 
     job = load(job_id)
     pending = {name for name, _ in steps}
     stages = {n: ("pending" if n in pending else job["stages"].get(n, "pending")) for n in STAGES}
-    # "run" lets the progress estimate know which stages, and which scenes, this run covers.
-    job = update(job_id, status="queued", stages=stages, error=None, run={"steps": [n for n, _ in steps], "scene": scene})
-    _queue.put((job_id, steps))
+    # "run" says which stages and scenes this run covers (for the estimate); its id lets stop() drop it from the queue.
+    run = {"id": uuid.uuid4().hex[:8], "steps": [n for n, _ in steps], "scene": scene}
+    job = update(job_id, status="queued", stages=stages, error=None, run=run)
+    _queue.put((job_id, run["id"], steps))
     return job
 
 
@@ -122,6 +124,28 @@ def enqueue_scene(job_id: str, index: int, image: bool) -> dict:
     return _submit(job_id, steps + [("video", redo_clip), ("assemble", assemble.run)], scene=index)
 
 
+def stop(job_id: str) -> dict:
+    """Stop a queued or running job. A running GPU render is interrupted; other stages stop when they finish."""
+    job = load(job_id)
+    if job["status"] == "queued":
+        stages = {n: ("stopped" if s == "pending" and n in job["run"]["steps"] else s) for n, s in job["stages"].items()}
+        return update(job_id, status="stopped", stages=stages)
+    if job["status"] == "running":
+        _stopping.add(job_id)
+        comfy.interrupt()
+    return job
+
+
+def _stopped(job_id: str) -> bool:
+    if job_id not in _stopping:
+        return False
+    _stopping.discard(job_id)
+    job = load(job_id)
+    stages = {n: ("stopped" if s in ("running", "pending") and n in job["run"]["steps"] else s) for n, s in job["stages"].items()}
+    update(job_id, status="stopped", error=None, stages=stages)
+    return True
+
+
 def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
     update(job_id, status="running")
     for name, fn in steps:
@@ -131,6 +155,8 @@ def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
         try:
             fn(job_dir(job_id), job)
         except Exception as e:
+            if _stopped(job_id):
+                return
             log.error("job %s stage %s failed\n%s", job_id, name, traceback.format_exc())
             job = load(job_id)
             update(job_id, status="failed", error=f"{name}: {e}", stages={**job["stages"], name: "failed"})
@@ -138,13 +164,18 @@ def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
         job = load(job_id)
         update(job_id, stages={**job["stages"], name: "done"})
         log.info("job %s stage %s done in %.1fs", job_id, name, time.time() - t0)
+        if _stopped(job_id):
+            return
     update(job_id, status="done")
 
 
 def _worker() -> None:
     while True:
-        job_id, steps = _queue.get()
-        _run(job_id, steps)
+        job_id, run_id, steps = _queue.get()
+        job = load(job_id)
+        # Skip runs that were stopped while queued, or replaced by a newer run of the same job.
+        if job["status"] == "queued" and job["run"]["id"] == run_id:
+            _run(job_id, steps)
 
 
 def start_worker() -> None:
