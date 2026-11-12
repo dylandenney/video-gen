@@ -51,16 +51,21 @@ def plan_slots(analysis: dict, lyrics: dict) -> list[dict]:
 
 
 MIN_SUNG = 1.0  # seconds of singing a slot needs before it is lip-synced
+PERFORMANCE = ("Performance video: the lead singer (the first cast member if any) performs the song. Every SING slot shows them singing, "
+               "each from a different angle or framing (straight-on close-up, three-quarter profile, slow push-in, low angle), "
+               "in one consistent setting and outfit. Other slots show them between lines (hands on the mic, a breath, a look away) "
+               "or a quiet detail of the setting. No other people unless the story idea asks for them; a story idea colors the setting and mood.")
 
 
-def mark_singing(slots: list[dict], lyrics: dict) -> list[dict]:
-    """Mark the slots with the most singing (up to a third of them) to be lip-synced close-ups.
+def mark_singing(slots: list[dict], lyrics: dict, performance: bool = False) -> list[dict]:
+    """Mark the slots with the most singing (up to a third of them, or all in performance mode) to be lip-synced.
 
     Decided here rather than by the LLM, which flagged too few or none.
     """
     for s in slots:
         s["sung"] = sum(max(0.0, min(s["end"], l["end"]) - max(s["start"], l["start"])) for l in lyrics["lines"])
-    best = sorted((s for s in slots if s["sung"] >= MIN_SUNG), key=lambda s: -s["sung"])[:max(1, len(slots) // 3)]
+    limit = len(slots) if performance else max(1, len(slots) // 3)
+    best = sorted((s for s in slots if s["sung"] >= MIN_SUNG), key=lambda s: -s["sung"])[:limit]
     return [{**{k: v for k, v in s.items() if k != "sung"}, "sing": s in best} for s in slots]
 
 
@@ -156,6 +161,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         f'Style notes from the user: {p.get("style") or "none"}',
         *([f'Story idea from the user (follow it; it overrides your own reading of the lyrics): {p["story"]}'] if p.get("story", "").strip() else []),
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
+        *([PERFORMANCE] if p.get('performance') else []),
         f'Frame: {SHAPES[p.get("aspect", "9:16")]}.',
         "",
         "Full song lyrics (the story and genre come from these; a first line may list the genre):" if full
@@ -180,7 +186,7 @@ def ask_llm(prompt: str) -> dict:
 def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
-    slots = mark_singing(plan_slots(analysis, lyrics), lyrics)
+    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, job["params"].get("performance", False))
     # Library characters bring their saved appearance; plain photos are described by the vision model.
     cast = [{**c, "description": c.get("appearance") or describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
     prompt = build_prompt(job, analysis, lyrics, slots, cast)

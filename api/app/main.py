@@ -100,6 +100,7 @@ class GenerateRequest(BaseModel):
     lyrics: str = ""
     style: str = ""
     story: str = Field("", max_length=4000)
+    performance: bool = False  # lip-sync every sung scene instead of up to a third
     motion: Literal["stills", "draft", "final"] = "draft"
     aspect: Literal["9:16", "16:9"] = "9:16"
 
