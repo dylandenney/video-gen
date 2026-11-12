@@ -41,6 +41,8 @@ QC_QUESTIONS = {
     "bad_hands": "are there extra, missing or fused fingers?",
     "distorted_face": "is any face warped?",
     "garbled_text": "is there unreadable text?",
+    "extra_limbs": "does anyone have extra or missing arms, legs, feet or shoes, or limbs joined wrongly?",
+    "unnatural_pose": "is anyone standing or sitting in a physically impossible or twisted pose?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
 }
 
