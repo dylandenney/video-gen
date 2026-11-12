@@ -43,19 +43,15 @@ QC_QUESTIONS = {
     "garbled_text": "is there unreadable text?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
 }
-QC_SCHEMA = {"type": "object", "required": list(QC_QUESTIONS), "properties": {k: {"type": "boolean"} for k in QC_QUESTIONS}}
 
 
-def check(path: Path, outfits: list[tuple[str, str]]) -> list[str]:
+def check(path: Path, extra: dict[str, str]) -> list[str]:
     """Defects the local vision model sees in a keyframe; empty means it looks fine.
 
-    outfits: (name, appearance) of each person when there are several, to catch swapped clothes.
+    extra: scene-specific yes/no questions (yes = defect) added to QC_QUESTIONS.
     """
-    questions, schema = QC_QUESTIONS, QC_SCHEMA
-    if outfits:
-        people = " ".join(f"{name}: {look}" for name, look in outfits)
-        questions = {**QC_QUESTIONS, "swapped_outfits": f"these people should appear: {people} Is anyone wearing clothes described for a different person?"}
-        schema = {"type": "object", "required": list(questions), "properties": {k: {"type": "boolean"} for k in questions}}
+    questions = {**QC_QUESTIONS, **extra}
+    schema = {"type": "object", "required": list(questions), "properties": {k: {"type": "boolean"} for k in questions}}
     ask = "Inspect this AI-generated film frame for defects. Answer each strictly: " + " ".join(f"{k}: {q}" for k, q in questions.items())
     result = ollama.chat(VISION_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": ask}],
                          schema=schema, keep_alive="2m", temperature=0)
@@ -84,13 +80,21 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     aspect = board.get("aspect", "9:16")
     w, h = oriented(W, H, aspect)
     refs = s["characters"][:3]
-    outfits = []
+    extra = {}
+    shot = s["image_prompt"]
+    if s.get("singing"):
+        # Lip sync runs at 480 px wide; a waist-up singer's mouth was too small to follow the words.
+        shot = f"Head-and-shoulders close-up, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
+        extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
+                                   "or is their mouth covered or turned away from the camera?")
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
         who = "; ".join(f"{chars[cid]['name']} is the person in image {n + 1}, looking and dressed exactly as described: {chars[cid]['appearance']}"
                         for n, cid in enumerate(refs))
-        outfits = [(chars[cid]["name"], chars[cid]["appearance"]) for cid in refs] if len(refs) > 1 else []
+        if len(refs) > 1:
+            people = " ".join(f"{chars[cid]['name']}: {chars[cid]['appearance']}" for cid in refs)
+            extra["swapped_outfits"] = f"these people should appear: {people} Is anyone wearing clothes described for a different person?"
         images = [comfy.upload(char_path(d, cid)) for cid in refs] + [None] * (3 - len(refs))
 
     for attempt in range(QC_ATTEMPTS):
@@ -98,14 +102,14 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         if refs:
             graph = comfy.fill("qwen_image_edit", width=w, height=h, seed=seed,
                                image1=images[0], image2=images[1], image3=images[2], prompt=(
-                f'Create a new cinematic film still, {COMPOSITION[aspect]}: {s["image_prompt"]} {who}. '
+                f'Create a new cinematic film still, {COMPOSITION[aspect]}: {shot} {who}. '
                 f"Keep each person's face, hair and body exactly as in their reference image; "
                 f"do not copy the background of the reference images. {style}."))
         else:
             graph = comfy.fill("qwen_image_t2i", width=w, height=h, seed=seed, negative=NEGATIVE,
-                               prompt=f'{s["image_prompt"]}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
+                               prompt=f'{shot}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
         comfy.run(graph, path)
-        problems = check(path, outfits)
+        problems = check(path, extra)
         if not problems:
             return
         log.info("scene %d attempt %d rejected: %s", s["index"], attempt + 1, "; ".join(problems))

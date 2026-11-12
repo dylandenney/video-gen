@@ -36,6 +36,7 @@ MODES = {
 }
 # Lip-synced singing scenes (InfiniteTalk), same size in every mode.
 SINGING = ("wan21_infinitetalk", 480, 832, 25)
+VOCAL_RMS = 0.15  # level of the clear-sounding vocals in testing
 
 
 def frames_for(seconds: float, fps: int) -> int:
@@ -71,7 +72,11 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
         workflow, w, h, fps = SINGING
         vocals, sr = sf.read(isolate_vocals(d))
         part = d / "clips" / f'{s["index"]:02d}_vocals.wav'
-        sf.write(part, vocals[int(s["start"] * sr):int((s["start"] + seconds) * sr)], sr)
+        seg = vocals[int(s["start"] * sr):int((s["start"] + seconds) * sr)]
+        # Same level for every song: quiet vocals gave the lip-sync model a weak signal and loose mouth shapes.
+        rms, peak = np.sqrt(np.mean(seg ** 2)), np.abs(seg).max()
+        gain = min(VOCAL_RMS / rms, 0.99 / peak) if peak > 0 else 1.0  # without clipping
+        sf.write(part, seg * gain, sr)
         audio = comfy.upload(part)
         prompt = f'The person sings these words with emotion, mouth clearly following the vocals. {prompt}'
     w, h = oriented(w, h, board.get("aspect", "9:16"))
