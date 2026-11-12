@@ -47,17 +47,26 @@ QC_QUESTIONS = {
 }
 
 
-def check(path: Path, extra: dict[str, str]) -> list[str]:
+def check(path: Path, extra: dict[str, str], people: int | None = None) -> list[str]:
     """Defects the local vision model sees in a keyframe; empty means it looks fine.
 
     extra: scene-specific yes/no questions (yes = defect) added to QC_QUESTIONS.
+    people: how many people the scene should show in focus; more means someone was drawn twice or an extra
+    person appeared (a yes/no "same person twice?" question missed these in testing, a head count caught them).
     """
     questions = {**QC_QUESTIONS, **extra}
     schema = {"type": "object", "required": list(questions), "properties": {k: {"type": "boolean"} for k in questions}}
     ask = "Inspect this AI-generated film frame for defects. Answer each strictly: " + " ".join(f"{k}: {q}" for k, q in questions.items())
+    if people is not None:
+        schema["required"].append("people")
+        schema["properties"]["people"] = {"type": "integer"}
+        ask += " people: how many people are in clear focus, including partly visible ones such as a lone arm (ignore blurred background figures)?"
     result = ollama.chat(VISION_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": ask}],
                          schema=schema, keep_alive="2m", temperature=0)
-    return [k for k, bad in result.items() if bad]
+    problems = [k for k in questions if result[k]]
+    if people is not None and result["people"] > people:
+        problems.append(f"{result['people']}_people_expected_{people}")
+    return problems
 
 
 LOOKS = {
@@ -111,7 +120,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
             graph = comfy.fill("qwen_image_t2i", width=w, height=h, seed=seed, negative=NEGATIVE,
                                prompt=f'{shot}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
         comfy.run(graph, path)
-        problems = check(path, extra)
+        problems = check(path, extra, len(refs) if refs else None)
         if not problems:
             return
         log.info("scene %d attempt %d rejected: %s", s["index"], attempt + 1, "; ".join(problems))
