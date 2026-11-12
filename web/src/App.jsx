@@ -88,6 +88,19 @@ function Job({ id, onChange, onDeleted }) {
   const [overview, setOverview] = useState(null);
   const [board, setBoard] = useState(null);
   const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", story: "", motion: "draft", aspect: "9:16" });
+  const [hearing, setHearing] = useState(false);
+  const hear = async () => {
+    setHearing(true);
+    setError("");
+    try {
+      const { lyrics } = await api(`/jobs/${id}/lyrics`, { method: "POST" });
+      setForm((f) => ({ ...f, lyrics }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setHearing(false);
+    }
+  };
   const [error, setError] = useState("");
   const audio = useRef(null);
 
@@ -185,7 +198,11 @@ function Job({ id, onChange, onDeleted }) {
 
       <section>
         <h3>2. Lyrics, story and style</h3>
-        <textarea rows={8} placeholder="Paste the lyrics from Suno (optional)" value={form.lyrics} onChange={(e) => setForm({ ...form, lyrics: e.target.value })} />
+        <textarea rows={8} placeholder="Paste the lyrics from Suno, or click Get lyrics from song. If left empty, the app listens for them when you generate." value={form.lyrics} onChange={(e) => setForm({ ...form, lyrics: e.target.value })} />
+        <p>
+          <button disabled={hearing} onClick={() => (!form.lyrics.trim() || confirm("Replace the lyrics in the box?")) && hear()}>{hearing ? "Listening… (about 3–4 min for a whole song)" : "Get lyrics from song"}</button>
+          <span className="muted"> Heard by AI, so check the words before exporting with lyrics on screen.</span>
+        </p>
         <textarea rows={3} placeholder="Story idea (optional). Leave empty to let the AI find a story in the lyrics. e.g. Two old friends drive to the coast; one is moving away. Ends at sunset on the beach." value={form.story || ""} onChange={(e) => setForm({ ...form, story: e.target.value })} />
         <input type="text" placeholder="Style notes, e.g. nostalgic, golden hour, small-town Georgia" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} />
         <div className="row">

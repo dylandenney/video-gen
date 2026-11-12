@@ -15,6 +15,7 @@ import librosa
 
 from ..config import MODELS_DIR, WHISPER_MODEL
 from ..jobs_io import write_json
+from .video import separate_vocals
 
 TAG = re.compile(r"^\s*[\[(].*[\])]\s*$")  # Suno section tags like [Chorus]
 
@@ -34,7 +35,13 @@ def transcribe(path: Path) -> list[dict]:
     audio, _ = librosa.load(path, sr=16000, mono=True)
     # No VAD: it treats singing over a full band as non-speech and drops most of it.
     segments, _ = model.transcribe(audio, word_timestamps=True, vad_filter=False, condition_on_previous_text=False)
-    return [{"w": norm(w.word), "start": float(w.start), "end": float(w.end)} for s in segments for w in s.words if norm(w.word)]
+    words = []
+    for w in (w for s in segments for w in s.words if norm(w.word)):
+        if words and norm(w.word).startswith("'"):  # Whisper splits "y'all" into "y" + "'all"
+            words[-1].update(w=words[-1]["w"] + norm(w.word), end=float(w.end))
+        else:
+            words.append({"w": norm(w.word), "start": float(w.start), "end": float(w.end)})
+    return words
 
 
 def align(lines: list[str], words: list[dict]) -> list[dict]:
@@ -78,11 +85,33 @@ def heard_lines(words: list[dict], gap: float = 0.8) -> list[dict]:
     if cur:
         lines.append(cur)
     return [{"text": " ".join(w["w"] for w in l), "start": round(l[0]["start"], 2), "end": round(l[-1]["end"], 2), "heard": True}
-            for l in lines if len(l) >= 2]
+            for l in lines for l in split_long(l) if len(l) >= 2]
+
+
+def split_long(words: list[dict], most: int = 12) -> list[list[dict]]:
+    """Split a run of fast singing with no clear pause into caption-sized lines."""
+    if len(words) <= most:
+        return [words]
+    n = len(words)  # the longest gap in the middle third, so the parts stay similar in length
+    k = max(range(n // 3, 2 * n // 3 + 1), key=lambda i: words[i]["start"] - words[i - 1]["end"])
+    return split_long(words[:k], most) + split_long(words[k:], most)
+
+
+def song_lyrics(d: Path, song: str) -> str:
+    """The whole song's lyrics as Whisper hears them, one sung phrase per line.
+
+    Transcribed from the vocals alone: the full mix drowned out many words.
+    """
+    vocals = d / "song_vocals.wav"
+    if not vocals.is_file():
+        separate_vocals(d / song, vocals)
+    return "\n".join(l["text"].capitalize() for l in heard_lines(transcribe(vocals)))
 
 
 def run(d: Path, job: dict) -> None:
     lines = pasted_lines(job["params"].get("lyrics", ""))
+    if WHISPER_MODEL and not lines:  # nothing pasted: use what Whisper hears in the whole song
+        lines = pasted_lines(song_lyrics(d, job["song"]))
     if not WHISPER_MODEL or not lines:
         result = {"source": "none", "lines": []}
     else:

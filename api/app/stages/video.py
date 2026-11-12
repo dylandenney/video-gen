@@ -45,19 +45,23 @@ def frames_for(seconds: float, fps: int) -> int:
 
 
 def isolate_vocals(d: Path) -> Path:
-    """vocals.wav: the singing from clip.wav, separated with Demucs on the CPU (about 15 s for a 20 s clip)."""
+    """vocals.wav: the singing from clip.wav."""
     path = d / "vocals.wav"
-    if path.is_file():
-        return path
+    if not path.is_file():
+        separate_vocals(d / "clip.wav", path)
+    return path
+
+
+def separate_vocals(src: Path, path: Path) -> None:
+    """Write the singing from src to path, separated with Demucs on the CPU (about 15 s per 20 s of audio)."""
     model = get_model("htdemucs")
-    y, _ = librosa.load(d / "clip.wav", sr=model.samplerate, mono=False)
+    y, _ = librosa.load(src, sr=model.samplerate, mono=False)
     y = np.atleast_2d(y)
     if y.shape[0] == 1:
         y = np.repeat(y, 2, 0)
     with torch.no_grad():
         stems = apply_model(model, torch.from_numpy(y)[None], device="cpu")[0]
     sf.write(path, stems[model.sources.index("vocals")].numpy().T, model.samplerate)
-    return path
 
 
 def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:

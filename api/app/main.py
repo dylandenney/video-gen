@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from . import characters, export, jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
+from .stages import lyrics
 from .stages.analyze import ffmpeg, song_overview
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -86,6 +87,15 @@ def resume_job(job_id: str) -> dict:
     if job["status"] not in ("failed", "stopped", "paused"):
         raise HTTPException(409, "only a failed, stopped or paused run can be resumed")
     return jobs.resume(job_id)
+
+
+@app.post("/api/jobs/{job_id}/lyrics")
+def transcribe_lyrics(job_id: str) -> dict:
+    """The song's lyrics as heard by Whisper, for the user to check (about 3–4 min for a whole song, mostly separating the vocals)."""
+    if not WHISPER_MODEL:
+        raise HTTPException(400, "lyrics transcription is turned off (WHISPER_MODEL is empty)")
+    job = get_job(job_id)
+    return {"lyrics": lyrics.song_lyrics(jobs.job_dir(job_id), job["song"])}
 
 
 @app.post("/api/jobs/{job_id}/stop")
