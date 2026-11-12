@@ -54,7 +54,7 @@ Style: {style}
 Format: Layer, Start, End, Style, Text
 """
     events = []
-    for l in lines:
+    for l in (l for l in lines if not l.get("heard")):  # heard-only lines are rough transcripts; keep them off screen
         line = l["text"].replace("{", "(").replace("}", ")").replace("\n", " ")
         events.append(f"Dialogue: 0,{ass_time(l['start'])},{ass_time(l['end'])},Lyric,{effect}{line}")
     path.write_text(header + "\n".join(events) + "\n")

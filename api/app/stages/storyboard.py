@@ -50,6 +50,20 @@ def plan_slots(analysis: dict, lyrics: dict) -> list[dict]:
     return slots
 
 
+MIN_SUNG = 1.0  # seconds of singing a slot needs before it is lip-synced
+
+
+def mark_singing(slots: list[dict], lyrics: dict) -> list[dict]:
+    """Mark the slots with the most singing (up to a third of them) to be lip-synced close-ups.
+
+    Decided here rather than by the LLM, which flagged too few or none.
+    """
+    for s in slots:
+        s["sung"] = sum(max(0.0, min(s["end"], l["end"]) - max(s["start"], l["start"])) for l in lyrics["lines"])
+    best = sorted((s for s in slots if s["sung"] >= MIN_SUNG), key=lambda s: -s["sung"])[:max(1, len(slots) // 3)]
+    return [{**{k: v for k, v in s.items() if k != "sung"}, "sing": s in best} for s in slots]
+
+
 SCHEMA = {
     "type": "object",
     "required": ["title", "story", "visual_style", "palette", "characters", "scenes"],
@@ -65,7 +79,7 @@ SCHEMA = {
         }},
         "scenes": {"type": "array", "items": {
             "type": "object",
-            "required": ["index", "emotion", "description", "characters", "image_prompt", "camera", "motion", "transition", "singing"],
+            "required": ["index", "emotion", "description", "characters", "image_prompt", "camera", "motion", "transition"],
             "properties": {
                 "index": {"type": "integer"},
                 "emotion": {"type": "string"},
@@ -75,7 +89,6 @@ SCHEMA = {
                 "camera": {"type": "string"},
                 "motion": {"type": "string"},
                 "transition": {"type": "string", "enum": ["cut", "crossfade", "flash", "fade_black"]},
-                "singing": {"type": "boolean"},
             },
         }},
     },
@@ -92,7 +105,7 @@ Rules:
 - image_prompt: a single cinematic still composed for that frame shape. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text; refer to characters by id in "characters".
 - Every image_prompt must be ONE physically real moment a camera could photograph. Never ask for people or images inside reflections, mirrors, glasses or eyes; ghosts; double exposures; overlays; split screens; visions; memories "in the mind"; or text and signs. Show memory and emotion through light, setting, props (an empty chair, an old photo on the dashboard) and expression instead.
 - camera: one camera move (e.g. slow push-in, orbit left, static, handheld drift). motion: what moves in the shot.
-- singing: true when one character performs the sung line to camera: a medium close-up or close-up, face toward the camera, mouth unobstructed. Only in slots where a line is sung, with exactly one character in the scene, and in at most a third of the scenes.
+- Slots marked SING are lip-synced: exactly one character (the lead singer) sings to camera in a head-and-shoulders close-up, face toward the camera, steady even light on the face, mouth fully visible with no hands, props, smoke or flames in front of it. Other slots must not show anyone singing.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
 - One consistent visual_style and palette (3-5 hex colors) for the whole video.
 Reply with JSON only."""
@@ -131,7 +144,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
             "",
         ]
     full = p.get("lyrics", "").strip()
-    timed = [f'[{l["start"]:.1f}-{l["end"]:.1f}s] {l["text"]}' for l in lyrics["lines"]]
+    timed = [f'[{l["start"]:.1f}-{l["end"]:.1f}s] {l["text"]}' + (' (sung; words approximate)' if l.get('heard') else '') for l in lyrics['lines']]
     if timed:
         in_clip = ["Sung in this clip (seconds from clip start):", *timed]
     elif full:
@@ -155,7 +168,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         f"Casting nudge for invented characters (vary from other videos): {casting_nudge(job['id'])}.",
         "",
         "Time slots (energy 0-1):",
-        *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' for s in slots],
+        *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' + (' SING' if s['sing'] else '') for s in slots],
     ])
 
 
@@ -167,7 +180,7 @@ def ask_llm(prompt: str) -> dict:
 def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
-    slots = plan_slots(analysis, lyrics)
+    slots = mark_singing(plan_slots(analysis, lyrics), lyrics)
     # Library characters bring their saved appearance; plain photos are described by the vision model.
     cast = [{**c, "description": c.get("appearance") or describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
     prompt = build_prompt(job, analysis, lyrics, slots, cast)
@@ -189,7 +202,9 @@ def run(d: Path, job: dict) -> None:
 
     known = set(by_id)
     board["scenes"] = [
-        {**by_index[s["index"]], **s, "characters": [c for c in by_index[s["index"]]["characters"] if c in known],
+        {**by_index[s["index"]], **{k: v for k, v in s.items() if k != "sing"},
+         "characters": (chars := [c for c in by_index[s["index"]]["characters"] if c in known]),
+         "singing": s["sing"] and len(chars) == 1,  # lip sync follows one face
          "seed": int(job["id"][:8], 16) + s["index"]}  # scene edits bump this to get a new take
         for s in slots
     ]

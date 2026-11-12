@@ -1,7 +1,8 @@
 """Stage 2: work out which lyric lines are sung in the clip, and when.
 
 The clip is transcribed with word timestamps and the pasted Suno lyrics are
-matched against it (the pasted text wins over Whisper's spelling). The
+matched against it (the pasted text wins over Whisper's spelling); singing that matches no pasted
+line is kept as Whisper heard it ("heard": true). The
 storyboard also gets the full pasted lyrics for story context.
 
 Writes lyrics.json: {"source": "pasted-aligned" | "none", "lines": [{"text", "start", "end"}]}.
@@ -60,7 +61,24 @@ def align(lines: list[str], words: list[dict]) -> list[dict]:
         taken.update(range(i, i + n))
         placed.add(line)
         out.append({"text": line, "start": round(words[i]["start"], 2), "end": round(words[i + n - 1]["end"], 2)})
+    # Suno often sings words that differ from the pasted lyrics. Keep that singing as Whisper heard it,
+    # so the storyboard knows where someone sings and can lip-sync it.
+    out += heard_lines([w for k, w in enumerate(words) if k not in taken])
     return sorted(out, key=lambda l: l["start"])
+
+
+def heard_lines(words: list[dict], gap: float = 0.8) -> list[dict]:
+    """Group transcript words into lines, split at pauses longer than `gap` seconds."""
+    lines, cur = [], []
+    for w in words:
+        if cur and w["start"] - cur[-1]["end"] > gap:
+            lines.append(cur)
+            cur = []
+        cur.append(w)
+    if cur:
+        lines.append(cur)
+    return [{"text": " ".join(w["w"] for w in l), "start": round(l[0]["start"], 2), "end": round(l[-1]["end"], 2), "heard": True}
+            for l in lines if len(l) >= 2]
 
 
 def run(d: Path, job: dict) -> None:
