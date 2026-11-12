@@ -83,26 +83,28 @@ def list_jobs() -> list[dict]:
     return sorted(jobs, key=lambda j: j["created"], reverse=True)
 
 
-def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = None, resume: bool = False) -> dict:
+def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = None, resume: bool = False, pause: bool = False) -> dict:
     """Queue (stage name, fn(job_dir, job)) steps; the named stages show as pending until they run."""
     job = load(job_id)
     pending = {name for name, _ in steps}
     stages = {n: ("pending" if n in pending else job["stages"].get(n, "pending")) for n in STAGES}
     # "run" says which stages and scenes this run covers (for the estimate); its id lets stop() drop it from the queue;
-    # "resume" makes keyframes and video keep the scenes they already finished.
-    run = {"id": uuid.uuid4().hex[:8], "steps": [n for n, _ in steps], "scene": scene, "resume": resume}
+    # "resume" makes keyframes and video keep the scenes they already finished;
+    # "pause" stops the run after keyframes so the images can be checked before the slow video stage.
+    run = {"id": uuid.uuid4().hex[:8], "steps": [n for n, _ in steps], "scene": scene, "resume": resume, "pause": pause}
     job = update(job_id, status="queued", stages=stages, error=None, run=run)
     _queue.put((job_id, run["id"], steps))
     return job
 
 
 def enqueue(job_id: str, from_stage: str = "audio") -> dict:
-    names = list(STAGES)
-    return _submit(job_id, [(n, STAGES[n]) for n in names[names.index(from_stage):]])
+    names = list(STAGES)[list(STAGES).index(from_stage):]
+    pause = load(job_id)["params"].get("review", False) and "keyframes" in names
+    return _submit(job_id, [(n, STAGES[n]) for n in names], pause=pause)
 
 
 def resume(job_id: str) -> dict:
-    """Continue a failed or stopped run from its first unfinished stage, keeping finished scenes."""
+    """Continue a failed, stopped or paused run from its first unfinished stage, keeping finished scenes."""
     job = load(job_id)
     first = next(n for n in STAGES if job["stages"].get(n) != "done")
     names = list(STAGES)
@@ -130,6 +132,8 @@ def enqueue_scene(job_id: str, index: int, image: bool) -> dict:
         finally:
             comfy.free()
 
+    if load(job_id)["status"] == "paused":  # reviewing images: redraw only, the clips come on Continue
+        return _submit(job_id, [("keyframes", redo_image)], scene=index, pause=True)
     steps = [("keyframes", redo_image)] if image else []
     return _submit(job_id, steps + [("video", redo_clip), ("assemble", assemble.run)], scene=index)
 
@@ -183,6 +187,9 @@ def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
         update(job_id, stages={**job["stages"], name: "done"})
         log.info("job %s stage %s done in %.1fs", job_id, name, time.time() - t0)
         if _stopped(job_id):
+            return
+        if name == "keyframes" and job["run"].get("pause"):
+            update(job_id, status="paused")
             return
     update(job_id, status="done")
 

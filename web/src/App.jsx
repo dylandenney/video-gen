@@ -205,6 +205,7 @@ function Job({ id, onChange, onDeleted }) {
             </select>
           </label>
           <label title="Every scene with singing becomes a lip-synced shot of the singer, from changing angles"><input type="checkbox" checked={!!form.performance} onChange={(e) => setForm({ ...form, performance: e.target.checked })} /> Performance (singer on camera)</label>
+          <label title="Stop after the images so you can check and redo them before the slow video stage"><input type="checkbox" checked={!!form.review} onChange={(e) => setForm({ ...form, review: e.target.checked })} /> Pause after images</label>
           <label>Frame{" "}
             <select value={form.aspect} onChange={(e) => setForm({ ...form, aspect: e.target.value })}>
               <option value="9:16">9:16 vertical (phones)</option>
@@ -213,6 +214,7 @@ function Job({ id, onChange, onDeleted }) {
           </label>
           <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
           {!busy && (job.status === "failed" || job.status === "stopped") && <button onClick={() => run(`/jobs/${id}/resume`)} title="Continue where it stopped, keeping finished scenes">Resume</button>}
+          {!busy && job.status === "paused" && <button className="primary" onClick={() => run(`/jobs/${id}/resume`)} title="Make the video clips from the current images">Continue to video</button>}
           {busy && <button onClick={() => confirm("Stop this run? Finished steps are kept.") && run(`/jobs/${id}/stop`)}>Stop</button>}
         </div>
         {!busy && plan && <p className="muted">A full run takes about {minutes(plan.minutes_left)} with nothing else running.</p>}
@@ -224,6 +226,7 @@ function Job({ id, onChange, onDeleted }) {
         <p className="muted">Tip: to try a different motion setting, change it and click "re-run from here" on Video clips. A new frame shape needs a re-run from Storyboard.</p>
         {error && <p className="error">{error}</p>}
         {job.error && <p className="error">Failed at {job.error}</p>}
+        {job.status === "paused" && <p className="eta">Paused after the images. Check them below, redo any bad ones, then click Continue to video.</p>}
         <ol className="stages">
           {Object.entries(job.stages).map(([name, status]) => (
             <li key={name} className={status}>
@@ -243,7 +246,7 @@ function Job({ id, onChange, onDeleted }) {
         </section>
       )}
 
-      {board && <Storyboard board={board} frames={frames} busy={busy} jobId={id} onJob={(j) => { setJob(j); onChange(); }} onBoard={setBoard}
+      {board && <Storyboard board={board} frames={frames} busy={busy} paused={job?.status === "paused"} jobId={id} onJob={(j) => { setJob(j); onChange(); }} onBoard={setBoard}
         img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`} />}
     </div>
   );
@@ -330,7 +333,7 @@ function Cast({ job, disabled, onChange }) {
   );
 }
 
-function Storyboard({ board, frames, img, busy, jobId, onJob, onBoard }) {
+function Storyboard({ board, frames, img, busy, paused, jobId, onJob, onBoard }) {
   const names = Object.fromEntries(board.characters.map((c) => [c.id, c.name]));
   const saved = (scene) => onBoard({ ...board, scenes: board.scenes.map((s) => (s.index === scene.index ? scene : s)) });
   return (
@@ -353,7 +356,7 @@ function Storyboard({ board, frames, img, busy, jobId, onJob, onBoard }) {
       <div className="scenes">
         {board.scenes.map((s) => (
           <Scene key={s.index} s={s} names={names} image={frames?.scenes[s.index] && img(frames.scenes[s.index])}
-            busy={busy} jobId={jobId} onJob={onJob} onSaved={saved} />
+            busy={busy} paused={paused} jobId={jobId} onJob={onJob} onSaved={saved} />
         ))}
       </div>
     </section>
@@ -362,7 +365,7 @@ function Storyboard({ board, frames, img, busy, jobId, onJob, onBoard }) {
 
 const SCENE_FIELDS = ["description", "image_prompt", "camera", "motion", "transition", "characters", "singing"];
 
-function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
+function Scene({ s, names, image, busy, paused, jobId, onJob, onSaved }) {
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const pick = (scene) => Object.fromEntries(SCENE_FIELDS.map((k) => [k, scene[k]]));
@@ -434,8 +437,8 @@ function Scene({ s, names, image, busy, jobId, onJob, onSaved }) {
       {!busy && (
         <div className="row scene-actions">
           {!edit && <button onClick={() => setEdit(pick(s))}>Edit</button>}
-          <button onClick={() => redo(true)} title="New keyframe, then a new clip">{edit ? "Save & redo" : "Redo"} image + clip</button>
-          {image && <button onClick={() => redo(false)} title="Keep the image, new video clip">{edit ? "Save & redo" : "Redo"} clip</button>}
+          <button onClick={() => redo(true)} title="New keyframe, then a new clip">{edit ? "Save & redo" : "Redo"} {paused ? "image" : "image + clip"}</button>
+          {image && !paused && <button onClick={() => redo(false)} title="Keep the image, new video clip">{edit ? "Save & redo" : "Redo"} clip</button>}
         </div>
       )}
       {error && <p className="error">{error}</p>}

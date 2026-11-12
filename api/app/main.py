@@ -83,8 +83,8 @@ def run_estimate(job_id: str, start: float, end: float, motion: Literal["stills"
 def resume_job(job_id: str) -> dict:
     """Continue a failed or stopped run, keeping the scenes it already finished."""
     job = get_job(job_id)
-    if job["status"] not in ("failed", "stopped"):
-        raise HTTPException(409, "only a failed or stopped run can be resumed")
+    if job["status"] not in ("failed", "stopped", "paused"):
+        raise HTTPException(409, "only a failed, stopped or paused run can be resumed")
     return jobs.resume(job_id)
 
 
@@ -113,6 +113,7 @@ class GenerateRequest(BaseModel):
     style: str = ""
     story: str = Field("", max_length=4000)
     performance: bool = False  # lip-sync every sung scene instead of up to a third
+    review: bool = False  # pause after the images so they can be checked before the video stage
     motion: Literal["stills", "draft", "final"] = "draft"
     aspect: Literal["9:16", "16:9"] = "9:16"
 
