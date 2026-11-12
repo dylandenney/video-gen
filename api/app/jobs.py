@@ -3,6 +3,7 @@
 The GPU is shared, so stages run one at a time across all jobs.
 """
 import logging
+import math
 import queue
 import threading
 import time
@@ -82,13 +83,14 @@ def list_jobs() -> list[dict]:
     return sorted(jobs, key=lambda j: j["created"], reverse=True)
 
 
-def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = None) -> dict:
+def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = None, resume: bool = False) -> dict:
     """Queue (stage name, fn(job_dir, job)) steps; the named stages show as pending until they run."""
     job = load(job_id)
     pending = {name for name, _ in steps}
     stages = {n: ("pending" if n in pending else job["stages"].get(n, "pending")) for n in STAGES}
-    # "run" says which stages and scenes this run covers (for the estimate); its id lets stop() drop it from the queue.
-    run = {"id": uuid.uuid4().hex[:8], "steps": [n for n, _ in steps], "scene": scene}
+    # "run" says which stages and scenes this run covers (for the estimate); its id lets stop() drop it from the queue;
+    # "resume" makes keyframes and video keep the scenes they already finished.
+    run = {"id": uuid.uuid4().hex[:8], "steps": [n for n, _ in steps], "scene": scene, "resume": resume}
     job = update(job_id, status="queued", stages=stages, error=None, run=run)
     _queue.put((job_id, run["id"], steps))
     return job
@@ -97,6 +99,14 @@ def _submit(job_id: str, steps: list[tuple[str, Callable]], scene: int | None = 
 def enqueue(job_id: str, from_stage: str = "audio") -> dict:
     names = list(STAGES)
     return _submit(job_id, [(n, STAGES[n]) for n in names[names.index(from_stage):]])
+
+
+def resume(job_id: str) -> dict:
+    """Continue a failed or stopped run from its first unfinished stage, keeping finished scenes."""
+    job = load(job_id)
+    first = next(n for n in STAGES if job["stages"].get(n) != "done")
+    names = list(STAGES)
+    return _submit(job_id, [(n, STAGES[n]) for n in names[names.index(first):]], resume=True)
 
 
 def enqueue_scene(job_id: str, index: int, image: bool) -> dict:
@@ -152,15 +162,23 @@ def _run(job_id: str, steps: list[tuple[str, Callable]]) -> None:
         job = load(job_id)
         update(job_id, stages={**job["stages"], name: "running"}, stage_started=time.time())
         t0 = time.time()
-        try:
-            fn(job_dir(job_id), job)
-        except Exception as e:
-            if _stopped(job_id):
+        # Long runs go overnight: a keyframes or video stage that fails is resumed once before giving up.
+        retries = 1 if name in ("keyframes", "video") and job["run"].get("scene") is None else 0
+        while True:
+            try:
+                fn(job_dir(job_id), load(job_id))
+                break
+            except Exception as e:
+                if _stopped(job_id):
+                    return
+                log.error("job %s stage %s failed\n%s", job_id, name, traceback.format_exc())
+                job = load(job_id)
+                if retries:
+                    retries -= 1
+                    update(job_id, run={**job["run"], "resume": True})
+                    continue
+                update(job_id, status="failed", error=f"{name}: {e}", stages={**job["stages"], name: "failed"})
                 return
-            log.error("job %s stage %s failed\n%s", job_id, name, traceback.format_exc())
-            job = load(job_id)
-            update(job_id, status="failed", error=f"{name}: {e}", stages={**job["stages"], name: "failed"})
-            return
         job = load(job_id)
         update(job_id, stages={**job["stages"], name: "done"})
         log.info("job %s stage %s done in %.1fs", job_id, name, time.time() - t0)
@@ -187,7 +205,7 @@ def start_worker() -> None:
 
 
 # Typical minutes on the DGX Spark with nothing else running, used until a stage has finished scenes to measure.
-FIXED = {"audio": 0.3, "lyrics": 0.5, "storyboard": 2.5, "keyframes": 1.0, "video": 0.3, "assemble": 1.0}
+FIXED = {"audio": 0.3, "lyrics": 0.5, "keyframes": 1.0, "video": 0.3, "assemble": 1.0}
 KEYFRAME = 0.6
 CLIP = {"stills": 0.0, "draft": 2.0, "final": 5.0}
 SINGING_CLIP = 4.0
@@ -196,6 +214,8 @@ OUTPUTS = {"keyframes": ("keyframes", "[0-9][0-9].png"), "video": ("clips", "[0-
 
 
 def typical(stage: str, scenes: int, singing: int, motion: str) -> float:
+    if stage == "storyboard":  # written in batches; about 4 min each with the GPU shared
+        return 4.0 * math.ceil(scenes / storyboard.BATCH)
     if stage == "keyframes":
         return FIXED[stage] + scenes * KEYFRAME
     if stage == "video":

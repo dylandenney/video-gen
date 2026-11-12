@@ -20,7 +20,7 @@
 1. [x] **Lip sync** — InfiniteTalk (Wan 2.1 14B 480p, replaced Wan 2.2 S2V after testing) on scenes the storyboard marks as singing on camera, driven by isolated vocals for that span.
 2. [x] Automatic hook detection (top 3 suggestions in the range picker).
 3. [x] 16:9 horizontal output (Frame setting; YouTube export preset).
-4. Full-length songs (overnight batch).
+4. [x] Full-length songs (Whole song button; batched storyboard, auto-retry once, Resume).
 5. [x] Lyric videos (export option: big centered lines over a dimmed picture).
 6. [x] Style presets (one-click style notes in the Lyrics and style step).
 7. Maintenance and extension documentation.

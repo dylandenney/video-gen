@@ -86,15 +86,20 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
 
 def run(d: Path, job: dict) -> None:
     clips = d / "clips"
-    shutil.rmtree(clips, ignore_errors=True)
-    (d / "vocals.wav").unlink(missing_ok=True)  # the audio clip may have changed
+    resume = job.get("run", {}).get("resume", False)
+    if not resume:
+        shutil.rmtree(clips, ignore_errors=True)
+        (d / "vocals.wav").unlink(missing_ok=True)  # the audio clip may have changed
     mode = job["params"].get("motion", "draft")
     if mode == "stills":
         return
     board = read_json(d / "storyboard.json")
-    clips.mkdir()
+    clips.mkdir(exist_ok=True)
     try:
         for s in board["scenes"]:
-            render_clip(d, board, s, mode)
+            clip, frame = clips / f'{s["index"]:02d}.mp4', d / "keyframes" / f'{s["index"]:02d}.png'
+            # Resuming keeps clips made from the current keyframe.
+            if not (resume and clip.is_file() and clip.stat().st_mtime > frame.stat().st_mtime):
+                render_clip(d, board, s, mode)
     finally:
         comfy.free()

@@ -116,6 +116,11 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     # Out of attempts: keep the last take; the scene editor can redo it.
 
 
+def done_before(path: Path, d: Path, job: dict) -> bool:
+    """When resuming, an output written after the current storyboard is kept instead of redrawn."""
+    return job.get("run", {}).get("resume", False) and path.is_file() and path.stat().st_mtime > (d / "storyboard.json").stat().st_mtime
+
+
 def run(d: Path, job: dict) -> None:
     board = read_json(d / "storyboard.json")
     (d / "keyframes").mkdir(exist_ok=True)
@@ -126,11 +131,12 @@ def run(d: Path, job: dict) -> None:
             path = char_path(d, c["id"])
             if "photo" in c:  # cast from the user's photo: use it as-is
                 shutil.copyfile(d / "cast" / c["photo"], path)
-                continue
-            comfy.run(sheet_graph(c["name"], c["appearance"], seed + 1000 + i), path)
+            elif not done_before(path, d, job):
+                comfy.run(sheet_graph(c["name"], c["appearance"], seed + 1000 + i), path)
         # Scenes without characters first, so ComfyUI switches between the two image models only once.
         for s in sorted(board["scenes"], key=lambda s: bool(s["characters"])):
-            render_scene(d, board, s)
+            if not done_before(d / "keyframes" / f'{s["index"]:02d}.png', d, job):
+                render_scene(d, board, s)
     finally:
         comfy.free()
 

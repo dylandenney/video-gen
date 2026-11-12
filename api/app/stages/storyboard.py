@@ -6,6 +6,7 @@ fixed slot, so the timing can't drift from the music.
 
 Writes storyboard.json.
 """
+import json
 import random
 from pathlib import Path
 
@@ -178,9 +179,38 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
     ])
 
 
-def ask_llm(prompt: str) -> dict:
+SCENES_SCHEMA = {"type": "object", "required": ["scenes"], "properties": {"scenes": SCHEMA["properties"]["scenes"]}}
+BATCH = 14  # scenes per LLM reply; a whole song (~50 scenes) is too long for one
+
+
+def ask_llm(prompt: str, schema: dict = SCHEMA) -> dict:
     return ollama.chat(OLLAMA_MODEL, [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
-                       schema=SCHEMA, temperature=0.7, num_ctx=8192)
+                       schema=schema, temperature=0.7, num_ctx=16384)
+
+
+def write_board(prompt: str, slots: list[dict]) -> dict:
+    """Ask for the storyboard BATCH slots at a time. The first reply fixes title, story, style and
+    characters; later batches get those back and only write scenes, so the look stays the same."""
+    board, scenes = None, {}
+    for i in range(0, len(slots), BATCH):
+        part = slots[i:i + BATCH]
+        ask = f"{prompt}\n\nWrite scenes for slots {part[0]['index']}-{part[-1]['index']} only."
+        if board:
+            fixed = {k: board[k] for k in ("title", "story", "visual_style", "palette", "characters")}
+            before = [f'{n}: {scenes[n]["description"]}' for n in sorted(scenes)[-3:]]
+            ask += ("\n\nAlready fixed for the whole video; reuse it exactly and add no new characters:\n"
+                    f"{json.dumps(fixed)}\nThe scenes just before these:\n" + "\n".join(before))
+        for _ in range(2):
+            reply = ask_llm(ask, SCHEMA if board is None else SCENES_SCHEMA)
+            got = {s["index"]: s for s in reply["scenes"]}
+            if all(s["index"] in got for s in part):
+                break
+        else:
+            raise RuntimeError(f"LLM returned {len(reply['scenes'])} scenes for slots {part[0]['index']}-{part[-1]['index']}")
+        board = board or reply
+        scenes.update({s["index"]: got[s["index"]] for s in part})
+    board["scenes"] = list(scenes.values())
+    return board
 
 
 def run(d: Path, job: dict) -> None:
@@ -189,15 +219,8 @@ def run(d: Path, job: dict) -> None:
     slots = mark_singing(plan_slots(analysis, lyrics), lyrics, job["params"].get("performance", False))
     # Library characters bring their saved appearance; plain photos are described by the vision model.
     cast = [{**c, "description": c.get("appearance") or describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
-    prompt = build_prompt(job, analysis, lyrics, slots, cast)
-
-    for _ in range(2):
-        board = ask_llm(prompt)
-        by_index = {s["index"]: s for s in board["scenes"]}
-        if all(s["index"] in by_index for s in slots):
-            break
-    else:
-        raise RuntimeError(f"LLM returned {len(board['scenes'])} scenes for {len(slots)} slots")
+    board = write_board(build_prompt(job, analysis, lyrics, slots, cast), slots)
+    by_index = {s["index"]: s for s in board["scenes"]}
 
     # Cast members are always characters, tied to their photo, even if the LLM left one out.
     by_id = {c["id"]: c for c in board["characters"]}

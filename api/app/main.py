@@ -79,6 +79,15 @@ def run_estimate(job_id: str, start: float, end: float, motion: Literal["stills"
     return jobs.estimate(get_job(job_id), {"start": start, "end": end, "motion": motion})
 
 
+@app.post("/api/jobs/{job_id}/resume")
+def resume_job(job_id: str) -> dict:
+    """Continue a failed or stopped run, keeping the scenes it already finished."""
+    job = get_job(job_id)
+    if job["status"] not in ("failed", "stopped"):
+        raise HTTPException(409, "only a failed or stopped run can be resumed")
+    return jobs.resume(job_id)
+
+
 @app.post("/api/jobs/{job_id}/stop")
 def stop_job(job_id: str) -> dict:
     get_job(job_id)
@@ -92,6 +101,9 @@ def delete_job(job_id: str) -> dict:
         raise HTTPException(409, "job is running; wait for it to finish")
     shutil.rmtree(jobs.job_dir(job_id))
     return {"deleted": job_id}
+
+
+MAX_SECONDS = 600  # whole songs are allowed; they run overnight
 
 
 class GenerateRequest(BaseModel):
@@ -109,8 +121,8 @@ def save_params(job_id: str, req: GenerateRequest) -> None:
     job = get_job(job_id)
     if job["status"] in ("queued", "running"):
         raise HTTPException(409, "job is already running")
-    if not 5 <= req.end - req.start <= 120:
-        raise HTTPException(400, "pick a section between 5 and 120 seconds")
+    if not 5 <= req.end - req.start <= MAX_SECONDS:
+        raise HTTPException(400, f"pick a section between 5 and {MAX_SECONDS} seconds")
     jobs.update(job_id, params=req.model_dump())
 
 

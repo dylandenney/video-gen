@@ -164,6 +164,7 @@ function Job({ id, onChange, onDeleted }) {
           <label>Start (s) <input type="number" step="0.5" value={form.start} onChange={(e) => setForm({ ...form, start: +e.target.value })} /></label>
           <label>End (s) <input type="number" step="0.5" value={form.end} onChange={(e) => setForm({ ...form, end: +e.target.value })} /></label>
           <span className="muted">{len.toFixed(1)} s of {fmt(overview.duration)}</span>
+          <button onClick={() => setForm({ ...form, start: 0, end: +overview.duration.toFixed(1) })} title="The whole song; best run overnight">Whole song</button>
         </div>
         {overview.hooks?.length > 0 && (
           <div className="row">
@@ -211,6 +212,7 @@ function Job({ id, onChange, onDeleted }) {
             </select>
           </label>
           <button className="primary" disabled={busy} onClick={() => run(`/jobs/${id}/generate`, form)}>{busy ? "Working…" : "Generate"}</button>
+          {!busy && (job.status === "failed" || job.status === "stopped") && <button onClick={() => run(`/jobs/${id}/resume`)} title="Continue where it stopped, keeping finished scenes">Resume</button>}
           {busy && <button onClick={() => confirm("Stop this run? Finished steps are kept.") && run(`/jobs/${id}/stop`)}>Stop</button>}
         </div>
         {!busy && plan && <p className="muted">A full run takes about {minutes(plan.minutes_left)} with nothing else running.</p>}
