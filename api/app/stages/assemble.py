@@ -5,6 +5,7 @@ with a camera move picked from the storyboard.
 
 Writes scenes/NN.mp4 and final.mp4.
 """
+import math
 from pathlib import Path
 
 from ..config import FPS, HEIGHT, WIDTH, oriented
@@ -36,7 +37,7 @@ TRANSITIONS = {
 
 def ken_burns(image: Path, scene: dict, seconds: float, size: tuple[int, int], out: Path) -> None:
     """Animate a keyframe with a camera move picked from the scene's camera text ("stills" mode)."""
-    n = max(1, round(seconds * FPS))
+    n = math.ceil(seconds * FPS) + 1  # never a frame short, or xfade shifts every later scene
     w, h = size
     cam = scene["camera"].lower()
     z, x, y = next((m for words, m in MOVES if any(w in cam for w in words)), DEFAULT_MOVE)
@@ -49,7 +50,7 @@ def ken_burns(image: Path, scene: dict, seconds: float, size: tuple[int, int], o
 
 def fit_clip(clip: Path, seconds: float, size: tuple[int, int], out: Path) -> None:
     """Scale/crop a generated clip to the output size and cut it to an exact frame count."""
-    n = max(1, round(seconds * FPS))
+    n = math.ceil(seconds * FPS) + 1  # never a frame short, or xfade shifts every later scene
     w, h = size
     ffmpeg("-i", str(clip), "-an", "-vf",
            f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,crop={w}:{h},"
