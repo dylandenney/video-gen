@@ -177,7 +177,10 @@ function Job({ id, onChange, onDeleted }) {
             ))}
           </div>
         )}
-        <audio ref={audio} controls src={file(id, "song")} />
+        {/* Plays only the chosen section: starts at Start, stops and rewinds at End. */}
+        <audio ref={audio} controls src={file(id, "song")}
+          onPlay={(e) => { const a = e.target; if (a.currentTime < form.start || a.currentTime >= form.end) a.currentTime = form.start; }}
+          onTimeUpdate={(e) => { const a = e.target; if (!a.paused && a.currentTime >= form.end) { a.pause(); a.currentTime = form.start; } }} />
       </section>
 
       <section>
