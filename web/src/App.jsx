@@ -129,7 +129,10 @@ function Job({ id, onChange, onDeleted }) {
 
   const [frames, setFrames] = useState(null);
   useEffect(() => {
-    if (job?.stages.keyframes === "done") fetch(file(id, "keyframes.json")).then((r) => r.json()).then(setFrames);
+    if (job?.stages.keyframes === "done") Promise.all([
+      fetch(file(id, "keyframes.json")).then((r) => r.json()),
+      fetch(file(id, "qc.json")).then((r) => (r.ok ? r.json() : {})),
+    ]).then(([f, qc]) => setFrames({ ...f, qc }));
     else setFrames(null);
   }, [id, job?.stages.keyframes, job?.updated]);
 
@@ -375,7 +378,7 @@ function Storyboard({ board, frames, img, busy, paused, jobId, onJob, onBoard })
       <h4>Scenes</h4>
       <div className="scenes">
         {board.scenes.map((s) => (
-          <Scene key={s.index} s={s} names={names} image={frames?.scenes[s.index] && img(frames.scenes[s.index])}
+          <Scene key={s.index} s={s} names={names} image={frames?.scenes[s.index] && img(frames.scenes[s.index])} qc={frames?.qc[s.index]}
             busy={busy} paused={paused} jobId={jobId} onJob={onJob} onSaved={saved} />
         ))}
       </div>
@@ -385,7 +388,16 @@ function Storyboard({ board, frames, img, busy, paused, jobId, onJob, onBoard })
 
 const SCENE_FIELDS = ["description", "image_prompt", "camera", "motion", "transition", "characters", "singing"];
 
-function Scene({ s, names, image, busy, paused, jobId, onJob, onSaved }) {
+// What the automatic image check said about each take of a scene's keyframe.
+function checkNote(takes) {
+  const words = (p) => p.replace(/^(\d+)_people_expected_(\d+)$/, "$1 people, expected $2").replaceAll("_", " ");
+  const last = takes[takes.length - 1];
+  const redrawn = takes.length > 1 ? `redrawn ${takes.length - 1}× (${takes.slice(0, -1).map((t) => t.map(words).join(", ")).join("; ")})` : "";
+  if (!last.length) return `Image check: passed${redrawn ? `, after being ${redrawn}` : " first time"}`;
+  return `Image check: still flagged (${last.map(words).join(", ")})${redrawn ? `, ${redrawn}` : ""}. Consider Redo or editing the text.`;
+}
+
+function Scene({ s, names, image, qc, busy, paused, jobId, onJob, onSaved }) {
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const pick = (scene) => Object.fromEntries(SCENE_FIELDS.map((k) => [k, scene[k]]));
@@ -415,6 +427,7 @@ function Scene({ s, names, image, busy, paused, jobId, onJob, onSaved }) {
   return (
     <article>
       {image && <img src={image} alt={`Scene ${s.index + 1}`} />}
+      {image && qc && <p className={qc[qc.length - 1].length ? "error" : "muted"}>{checkNote(qc)}</p>}
       <header>{s.index + 1} · {s.start.toFixed(1)}–{s.end.toFixed(1)}s · {s.emotion} · {s.transition}</header>
       {edit ? (
         <>

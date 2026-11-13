@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 app = FastAPI(title="musicvid")
 
 # Only these files may be fetched from a job folder.
-PUBLIC_FILES = {"clip.wav", "overview.json", "analysis.json", "lyrics.json", "storyboard.json", "keyframes.json", "final.mp4"}
+PUBLIC_FILES = {"clip.wav", "overview.json", "analysis.json", "lyrics.json", "storyboard.json", "keyframes.json", "qc.json", "final.mp4"}
 
 
 @app.on_event("startup")

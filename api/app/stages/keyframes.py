@@ -44,6 +44,7 @@ QC_QUESTIONS = {
     "extra_limbs": "does anyone have extra or missing arms, legs, feet or shoes, or limbs joined wrongly?",
     "unnatural_pose": "is anyone standing or sitting in a physically impossible or twisted pose?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
+    "collage": "is the image split into two or more separate pictures or panels?",
 }
 
 
@@ -95,7 +96,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     shot = s["image_prompt"]
     if s.get("singing"):
         # Lip sync runs at 480 px wide; a waist-up singer's mouth was too small to follow the words.
-        shot = f"Head-and-shoulders close-up, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
+        shot = f"Head-and-shoulders close-up of the singer standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
     if refs:
@@ -108,6 +109,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
             extra["swapped_outfits"] = f"these people should appear: {people} Is anyone wearing clothes described for a different person?"
         images = [comfy.upload(char_path(d, cid)) for cid in refs] + [None] * (3 - len(refs))
 
+    takes = []
     for attempt in range(QC_ATTEMPTS):
         seed = s["seed"] + attempt * 100
         if refs:
@@ -121,10 +123,15 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
                                prompt=f'{shot}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
         comfy.run(graph, path)
         problems = check(path, extra, len(refs) if refs else None)
+        takes.append(problems)
         if not problems:
-            return
+            break
         log.info("scene %d attempt %d rejected: %s", s["index"], attempt + 1, "; ".join(problems))
     # Out of attempts: keep the last take; the scene editor can redo it.
+    # qc.json keeps what each take was rejected for, for the scene cards.
+    qc_path = d / "qc.json"
+    qc = read_json(qc_path) if qc_path.is_file() else {}
+    write_json(qc_path, {**qc, str(s["index"]): takes})
 
 
 def done_before(path: Path, d: Path, job: dict) -> bool:

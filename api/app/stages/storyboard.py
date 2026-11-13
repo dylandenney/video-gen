@@ -148,7 +148,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
     if cast:
         cast_lines = [
             "Cast from the user's photos. These real people MUST be the main characters. Use exactly these ids and names, "
-            "copy each description into their appearance (you may change clothing to fit the story, never face, hair or age), "
+            "copy each description into their appearance word for word, "
             "and add other characters only if the story needs them:",
             *[f'- id "{c["id"]}", name "{c["name"]}": {c["description"]}' for c in cast],
             "",
@@ -221,16 +221,17 @@ def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
     slots = mark_singing(plan_slots(analysis, lyrics), lyrics, job["params"].get("performance", False))
-    # Library characters bring their saved appearance; plain photos are described by the vision model.
-    cast = [{**c, "description": c.get("appearance") or describe_photo(d / "cast" / c["photo"])} for c in job.get("cast", [])]
+    # Every cast member is described from their picture, so the text matches the face the edit model copies;
+    # a short library note like "sassy blonde country singer" let the LLM invent a different haircut and outfit.
+    cast = [{**c, "description": describe_photo(d / "cast" / c["photo"]) + (f' ({c["appearance"]})' if c.get("appearance") else "")}
+            for c in job.get("cast", [])]
     board = write_board(build_prompt(job, analysis, lyrics, slots, cast), slots)
     by_index = {s["index"]: s for s in board["scenes"]}
 
     # Cast members are always characters, tied to their photo, even if the LLM left one out.
     by_id = {c["id"]: c for c in board["characters"]}
     for c in cast:
-        by_id.setdefault(c["id"], {"id": c["id"], "name": c["name"], "appearance": c["description"]})
-        by_id[c["id"]]["photo"] = c["photo"]
+        by_id[c["id"]] = {"id": c["id"], "name": c["name"], "appearance": c["description"], "photo": c["photo"]}
     board["characters"] = list(by_id.values())
 
     known = set(by_id)
