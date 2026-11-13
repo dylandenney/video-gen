@@ -12,6 +12,9 @@ VISION_MODEL = os.environ.get("VISION_MODEL", "qwen2.5vl:7b")
 QC_MODEL = os.environ.get("QC_MODEL", "qwen3.5:27b")
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
 
+# Azure Foundry configuration for LTX-2.5
+AZURE_FOUNDRY_RESOURCE_NAME = os.environ.get("AZURE_FOUNDRY_RESOURCE_NAME", "")
+
 # Empty = lyric alignment disabled (no model download). e.g. "large-v3-turbo"
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "")
 

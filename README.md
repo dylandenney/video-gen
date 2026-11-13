@@ -16,12 +16,14 @@ Logs: `docker compose logs -f api`. Job files: `data/jobs/<id>/`.
 
 ## Pipeline
 
-| Stage | File | Output |
-|---|---|---|
-| audio | `api/app/stages/analyze.py` | `clip.wav`, `analysis.json` (tempo, beats, sections, energy) |
-| lyrics | `api/app/stages/lyrics.py` | `lyrics.json` (pasted lyrics, timed when Whisper is on) |
-| storyboard | `api/app/stages/storyboard.py` | `storyboard.json` (characters, scenes, prompts, camera) |
-| assemble | `api/app/stages/assemble.py` | `scenes/*.mp4`, `final.mp4` |
+|| Stage | File | Output |
+||---|---|---|
+|| audio | `api/app/stages/analyze.py` | `clip.wav`, `analysis.json` (tempo, beats, sections, energy) |
+|| lyrics | `api/app/stages/lyrics.py` | `lyrics.json` (pasted lyrics, timed when Whisper is on) |
+|| storyboard | `api/app/stages/storyboard.py` | `storyboard.json` (characters, scenes, prompts, camera) |
+|| keyframes | `api/app/stages/keyframes.py` | `keyframes/*.png` |
+|| video | `api/app/stages/video.py` | `clips/*.mp4` |
+|| assemble | `api/app/stages/assemble.py` | `scenes/*.mp4`, `final.mp4` |
 
 Stages run one at a time through a single worker so GPU-heavy steps never overlap.
 Each stage only reads earlier stages' files, so any stage can be re-run or replaced
