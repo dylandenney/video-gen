@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 
 from ..adapters import comfy, ollama
-from ..config import VISION_MODEL, oriented
+from ..config import QC_MODEL, oriented
 from ..jobs_io import read_json, write_json
 
 # 9:16 size Qwen-Image was trained on (turned for 16:9); assembly scales it to the output size.
@@ -38,9 +38,11 @@ def char_path(d: Path, char_id: str) -> Path:
 QC_QUESTIONS = {
     "person_in_reflection": "does any mirror, window, glasses lens, eye or other reflective surface show a face or human figure?",
     "ghost_or_double_exposure": "is any person semi-transparent, overlaid or faded into the scene?",
-    "bad_hands": "are there extra, missing or fused fingers?",
+    # No hands question: the checker flagged normal hands in most frames, so every image would be redrawn.
     "distorted_face": "is any face warped?",
     "garbled_text": "is there unreadable text?",
+    "twisted_body": "does anyone's face point the opposite way from their body, like a face on the back of the head or a front-facing face above a back view?",
+    "duplicate_props": "does anyone hold or stand at two of something meant to be single, like two microphones?",
     "extra_limbs": "does anyone have extra or missing arms, legs, feet or shoes, or limbs joined wrongly?",
     "unnatural_pose": "is anyone standing or sitting in a physically impossible or twisted pose?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
@@ -62,7 +64,7 @@ def check(path: Path, extra: dict[str, str], people: int | None = None) -> list[
         schema["required"].append("people")
         schema["properties"]["people"] = {"type": "integer"}
         ask += " people: how many people are in clear focus, including partly visible ones such as a lone arm (ignore blurred background figures)?"
-    result = ollama.chat(VISION_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": ask}],
+    result = ollama.chat(QC_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": ask}],
                          schema=schema, keep_alive="2m", temperature=0)
     problems = [k for k in questions if result[k]]
     if people is not None and result["people"] > people:
