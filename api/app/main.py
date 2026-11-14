@@ -75,7 +75,7 @@ def job_status(job_id: str) -> dict:
 
 
 @app.get("/api/jobs/{job_id}/estimate")
-def run_estimate(job_id: str, start: float, end: float, motion: Literal["stills", "draft", "final", "ltx"] = "draft") -> dict:
+def run_estimate(job_id: str, start: float, end: float, motion: Literal["stills", "draft", "final", "ltx"] = "ltx") -> dict:
     """Rough minutes for a full run with these settings, before it starts."""
     return jobs.estimate(get_job(job_id), {"start": start, "end": end, "motion": motion})
 
@@ -124,7 +124,7 @@ class GenerateRequest(BaseModel):
     story: str = Field("", max_length=4000)
     performance: bool = False  # lip-sync every sung scene instead of up to a third
     review: bool = False  # pause after the images so they can be checked before the video stage
-    motion: Literal["stills", "draft", "final", "ltx"] = "draft"
+    motion: Literal["stills", "draft", "final", "ltx"] = "ltx"
     aspect: Literal["9:16", "16:9"] = "9:16"
 
 

@@ -87,7 +87,7 @@ function Job({ id, onChange, onDeleted }) {
   const [job, setJob] = useState(null);
   const [overview, setOverview] = useState(null);
   const [board, setBoard] = useState(null);
-  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", story: "", motion: "draft", aspect: "9:16" });
+  const [form, setForm] = useState({ start: 0, end: 25, lyrics: "", style: "", story: "", motion: "ltx", aspect: "9:16" });
   const [hearing, setHearing] = useState(false);
   const hear = async () => {
     setHearing(true);
@@ -110,7 +110,7 @@ function Job({ id, onChange, onDeleted }) {
     setError("");
     api(`/jobs/${id}`).then((j) => {
       setJob(j);
-      if (j.params.start !== undefined) setForm({ motion: "draft", aspect: "9:16", ...j.params });
+      if (j.params.start !== undefined) setForm({ motion: "ltx", aspect: "9:16", ...j.params });
     });
     fetch(file(id, "overview.json")).then((r) => r.json()).then(setOverview);
   }, [id]);
