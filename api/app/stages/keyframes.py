@@ -87,6 +87,14 @@ def sheet_graph(name: str, appearance: str, seed: int, look: str = "realistic") 
         f"neutral expression, plain light grey studio background, soft even light, {finish}."))
 
 
+ANGLE_SHOT = {
+    "left_three_quarter": "three-quarter view, their face turned toward the left side of the frame",
+    "right_three_quarter": "three-quarter view, their face turned toward the right side of the frame",
+    "left_profile": "side profile, their face pointing toward the left side of the frame",
+    "right_profile": "side profile, their face pointing toward the right side of the frame",
+}
+
+
 def render_scene(d: Path, board: dict, s: dict) -> None:
     """Draw one scene's keyframe (keyframes/NN.png), retrying with new seeds while the quality check finds defects."""
     path = d / "keyframes" / f'{s["index"]:02d}.png'
@@ -109,7 +117,20 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         if len(refs) > 1:
             people = " ".join(f"{chars[cid]['name']}: {chars[cid]['appearance']}" for cid in refs)
             extra["swapped_outfits"] = f"these people should appear: {people} Is anyone wearing clothes described for a different person?"
-        images = [comfy.upload(char_path(d, cid)) for cid in refs] + [None] * (3 - len(refs))
+        paths = [char_path(d, cid) for cid in refs]
+        angle = s.get("angle", "front")
+        if s.get("singing") and angle.endswith("profile"):
+            angle = angle.replace("profile", "three_quarter")  # lip sync needs the mouth in view
+        if photo := chars[refs[0]].get("angles", {}).get(angle):
+            # The lead's real photo from this angle; with a free slot, their front photo too for the face.
+            paths[0] = d / "cast" / photo
+            who += f"; image 1 shows {chars[refs[0]]['name']} from the angle wanted"
+            if len(refs) < 3:
+                paths.append(char_path(d, refs[0]))
+                who += f"; image {len(paths)} is the same person from the front, for their face"
+        if angle in ANGLE_SHOT:
+            shot = f"{chars[refs[0]]['name']} is seen in a {ANGLE_SHOT[angle]}. {shot}"
+        images = [comfy.upload(p) for p in paths] + [None] * (3 - len(paths))
 
     takes = []
     for attempt in range(QC_ATTEMPTS):

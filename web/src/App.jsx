@@ -305,6 +305,7 @@ function Export({ jobId, version }) {
 function Cast({ job, disabled, onChange }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
   const [library, setLibrary] = useState([]);
   useEffect(() => { api("/characters").then((cs) => setLibrary(cs.filter((c) => c.status === "ready"))).catch(() => {}); }, []);
   const cast = job.cast || [];
@@ -317,22 +318,30 @@ function Cast({ job, disabled, onChange }) {
     const body = new FormData();
     body.append("file", f);
     body.append("name", name);
+    setAdding(true);
     try {
       onChange(await api(`/jobs/${job.id}/cast`, { method: "POST", body }));
       setName("");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setAdding(false);
     }
   }
 
   return (
     <section>
       <h3>3. Cast (optional)</h3>
-      <p className="muted">Add up to 3 people to star in the video: saved characters from the library, or photos. Clear, front-facing photos work best. Photos stay on this machine. Only use photos of people who agreed.</p>
+      <p className="muted">Add up to 3 people to star in the video: saved characters from the library, or photos. Clear, front-facing photos work best. For side shots too, add a 10–20 second video of the person slowly turning on the spot, starting face-on. Photos and videos stay on this machine. Only use photos of people who agreed.</p>
       <div className="cast">
         {cast.map((c) => (
           <figure key={c.id}>
             <img src={`/api/jobs/${job.id}/images/cast/${c.photo}`} alt={c.name} />
+            {c.angles && (
+              <div className="angles">
+                {Object.entries(c.angles).map(([a, f]) => <img key={a} src={`/api/jobs/${job.id}/images/cast/${f}`} alt={a.replace(/_/g, " ")} title={a.replace(/_/g, " ")} />)}
+              </div>
+            )}
             <figcaption>
               {c.name}
               {!disabled && <button className="link" onClick={() => api(`/jobs/${job.id}/cast/${c.id}`, { method: "DELETE" }).then(onChange)}>remove</button>}
@@ -343,7 +352,7 @@ function Cast({ job, disabled, onChange }) {
       {cast.length < 3 && !disabled && (
         <div className="row">
           <input type="text" placeholder="Name, e.g. Dylan" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 200, marginBottom: 0 }} />
-          <label className="button">Add photo<input type="file" accept="image/*" onChange={add} hidden /></label>
+          <label className="button">{adding ? "Finding angles…" : "Add photo or turn-around video"}<input type="file" accept="image/*,video/*" onChange={add} disabled={adding} hidden /></label>
           {library.length > 0 && (
             <select value="" onChange={(e) => e.target.value && api(`/jobs/${job.id}/cast/library/${e.target.value}`, { method: "POST" }).then(onChange).catch((err) => setError(err.message))}>
               <option value="">Add from library…</option>

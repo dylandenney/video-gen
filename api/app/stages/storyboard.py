@@ -85,13 +85,14 @@ SCHEMA = {
         }},
         "scenes": {"type": "array", "items": {
             "type": "object",
-            "required": ["index", "emotion", "description", "characters", "image_prompt", "camera", "motion", "transition"],
+            "required": ["index", "emotion", "description", "characters", "image_prompt", "angle", "camera", "motion", "transition"],
             "properties": {
                 "index": {"type": "integer"},
                 "emotion": {"type": "string"},
                 "description": {"type": "string"},
                 "characters": {"type": "array", "items": {"type": "string"}},
                 "image_prompt": {"type": "string"},
+                "angle": {"type": "string", "enum": ["front", "left_three_quarter", "right_three_quarter", "left_profile", "right_profile"]},
                 "camera": {"type": "string"},
                 "motion": {"type": "string"},
                 "transition": {"type": "string", "enum": ["cut", "crossfade", "flash", "fade_black"]},
@@ -112,6 +113,7 @@ Rules:
 - Every image_prompt must be ONE physically real moment a camera could photograph. Never ask for people or images inside reflections, mirrors, glasses or eyes; ghosts; double exposures; overlays; split screens; visions; memories "in the mind"; or text and signs. Show memory and emotion through light, setting, props (an empty chair, an old photo on the dashboard) and expression instead.
 - Write image_prompt as plain positive description; image models ignore or invert "no", "not" and "only". When a person handles something they also wear or use in pairs (shoes, gloves, earrings, a jacket going on), say where each one is: "her left foot in a sneaker, her right foot bare as she pulls the other sneaker on". Give each person clear, simple body positions, like which hand holds what and where the feet are.
 - Characters face the camera or are seen in profile, never from behind or over the shoulder: the image model copies their face from a front-facing reference and puts it on backwards.
+- angle: which way the main character's face points, as seen by the camera ("left" = toward the left side of the frame). Use "front" unless the prompt says angle photos exist.
 - Name each prop once with its count and place ("one vintage microphone on a stand in front of her"); never mention the same prop twice in a prompt, or it gets drawn twice.
 - camera: one camera move (e.g. slow push-in, orbit left, static, handheld drift). motion: what moves in the shot.
 - description and motion must continue exactly from the image_prompt: same objects in the same hands and places, and motion says precisely what happens next ("she slides the sneaker onto her bare right foot"), never a different action.
@@ -155,6 +157,12 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
             *[f'- id "{c["id"]}", name "{c["name"]}": {c["description"]}' for c in cast],
             "",
         ]
+        if with_angles := [c["name"] for c in cast if c.get("angles")]:
+            cast_lines += [
+                f"Angle photos exist for {', '.join(with_angles)}. Vary the angle in their scenes like a real shoot: about a third "
+                "three_quarter or profile (left and right), the rest front. In SING slots use front or three_quarter.",
+                "",
+            ]
     full = p.get("lyrics", "").strip()
     timed = [f'[{l["start"]:.1f}-{l["end"]:.1f}s] {l["text"]}' + (' (sung; words approximate)' if l.get('heard') else '') for l in lyrics['lines']]
     if timed:
@@ -233,7 +241,8 @@ def run(d: Path, job: dict) -> None:
     # Cast members are always characters, tied to their photo, even if the LLM left one out.
     by_id = {c["id"]: c for c in board["characters"]}
     for c in cast:
-        by_id[c["id"]] = {"id": c["id"], "name": c["name"], "appearance": c["description"], "photo": c["photo"]}
+        by_id[c["id"]] = {"id": c["id"], "name": c["name"], "appearance": c["description"], "photo": c["photo"],
+                          **({"angles": c["angles"]} if c.get("angles") else {})}
     board["characters"] = list(by_id.values())
 
     known = set(by_id)

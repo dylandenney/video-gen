@@ -48,6 +48,8 @@ video { max-height: 70vh; max-width: 100%; border-radius: 8px; background: #000;
 .cast { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .cast figure { margin: 0; width: 120px; font-size: 14px; }
 .cast img { width: 120px; height: 160px; object-fit: cover; border-radius: 6px; display: block; margin-bottom: 4px; }
+.cast .angles { display: flex; gap: 2px; margin-bottom: 4px; }
+.cast .angles img { width: 22px; height: 30px; border-radius: 3px; margin: 0; }
 select { font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
 .field { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
 .field textarea, .field select { display: block; width: 100%; margin-top: 2px; color: var(--text); font-size: 14px; }

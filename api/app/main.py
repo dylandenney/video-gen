@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import characters, export, jobs
+from . import angles, characters, export, jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
 from .stages import lyrics
@@ -265,15 +265,18 @@ def to_png(data: bytes, folder: Path, name: str) -> Path:
 
 
 def add_to_cast(job_id: str, name: str, make_photo, appearance: str | None = None) -> dict:
-    """Append a cast entry; make_photo(folder, filename) writes its PNG into the job's cast folder."""
+    """Append a cast entry; make_photo(folder, filename) writes its PNG into the job's cast folder
+    and may return {angle: file name} of extra angle photos."""
     job = get_job(job_id)
     cast = job.get("cast", [])
     if len(cast) >= 3:
         raise HTTPException(400, "up to 3 cast members")
     n = max((int(c["id"].split("_")[1]) for c in cast), default=0) + 1
     photo = f"cast_{n}_{uuid.uuid4().hex[:8]}.png"  # unique name so browsers never show a removed photo
-    make_photo(jobs.job_dir(job_id) / "cast", photo)
+    views = make_photo(jobs.job_dir(job_id) / "cast", photo)
     entry = {"id": f"cast_{n}", "name": name.strip() or f"Person {n}", "photo": photo}
+    if views:
+        entry["angles"] = views
     if appearance:
         entry["appearance"] = appearance
     return jobs.update(job_id, cast=[*cast, entry])
@@ -281,9 +284,31 @@ def add_to_cast(job_id: str, name: str, make_photo, appearance: str | None = Non
 
 @app.post("/api/jobs/{job_id}/cast")
 async def add_cast(job_id: str, file: UploadFile, name: str = Form(...)) -> dict:
-    """Add a photo of a real person to cast as a character (stays on this machine)."""
+    """Add a photo of a real person to cast as a character (stays on this machine).
+    A video of them turning on the spot instead gives angle photos for side and three-quarter shots."""
     data = await file.read()
+    if (file.content_type or "").startswith("video/") or Path(file.filename or "").suffix.lower() in (".mp4", ".mov", ".m4v", ".webm"):
+        return add_to_cast(job_id, name, lambda folder, photo: from_video(data, folder, photo))
     return add_to_cast(job_id, name, lambda folder, photo: to_png(data, folder, photo))
+
+
+def from_video(data: bytes, folder: Path, photo: str) -> dict[str, str]:
+    """Angle photos from a turn-around video; the front view becomes the cast photo."""
+    folder.mkdir(parents=True, exist_ok=True)
+    raw = folder / f"upload_{uuid.uuid4().hex[:8]}"
+    raw.write_bytes(data)
+    try:
+        views = angles.from_video(raw, folder, Path(photo).stem)
+    except subprocess.CalledProcessError:
+        raise HTTPException(400, "could not read that video")
+    finally:
+        raw.unlink()
+    if "front" not in views:
+        for name in views.values():
+            (folder / name).unlink()
+        raise HTTPException(400, "no front-facing view found; start the video facing the camera")
+    (folder / views.pop("front")).replace(folder / photo)
+    return views
 
 
 @app.post("/api/jobs/{job_id}/cast/library/{cid}")
@@ -310,7 +335,8 @@ def remove_cast(job_id: str, cast_id: str) -> dict:
     entry = next((c for c in cast if c["id"] == cast_id), None)
     if entry is None:
         raise HTTPException(404)
-    (jobs.job_dir(job_id) / "cast" / entry["photo"]).unlink(missing_ok=True)
+    for name in [entry["photo"], *entry.get("angles", {}).values()]:
+        (jobs.job_dir(job_id) / "cast" / name).unlink(missing_ok=True)
     return jobs.update(job_id, cast=[c for c in cast if c is not entry])
 
 
