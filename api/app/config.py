@@ -12,8 +12,13 @@ VISION_MODEL = os.environ.get("VISION_MODEL", "qwen2.5vl:7b")
 QC_MODEL = os.environ.get("QC_MODEL", "qwen3.5:27b")
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
 
-# Azure Foundry configuration for LTX-2.5
+# LTX-2.5 on Azure Foundry. Resource name only (the part before .services.ai.azure.com).
+# Key is optional: without it the adapter uses Microsoft Entra ID (az login / service principal).
 AZURE_FOUNDRY_RESOURCE_NAME = os.environ.get("AZURE_FOUNDRY_RESOURCE_NAME", "")
+AZURE_FOUNDRY_API_KEY = os.environ.get("AZURE_FOUNDRY_API_KEY", "")
+LTX_DEPLOYMENT = os.environ.get("LTX_DEPLOYMENT", "Fal-LTX-2.5-Fast")
+LTX_RESOLUTION = os.environ.get("LTX_RESOLUTION", "1080p")
+LTX_TIMEOUT = int(os.environ.get("LTX_TIMEOUT", "900"))  # seconds to wait for one clip
 
 # Empty = lyric alignment disabled (no model download). e.g. "large-v3-turbo"
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "")

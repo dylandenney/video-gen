@@ -1,124 +1,137 @@
-"""Minimal LTX-2.5 API client for video generation.
+"""LTX-2.5 client for Azure Foundry (fal.ai route).
 
-This adapter integrates with Azure Foundry's LTX-2.5 service to generate synchronized
-audio-video clips from text prompts, replacing the ComfyUI-based Wan 2.2 workflow.
+The API is a queue: submit a job, poll its status, fetch the result, then download the mp4.
 
-Uses Foundry's REST API for video generation with proper authentication.
+    POST {base}/text-to-video/fast   -> {request_id, status_url, response_url, cancel_url}
+    GET  status_url                  -> {status: IN_QUEUE | IN_PROGRESS | COMPLETED, ...}
+    GET  response_url                -> {video: {url, duration, fps, width, height, ...}}
+    GET  video.url                   -> the mp4 (needs the same auth header)
+
+Auth: AZURE_FOUNDRY_API_KEY (sent as the `api-key` header) if set, otherwise a Microsoft Entra
+token from azure-identity (az login, or a service principal through the AZURE_* env vars).
+
+Verified against the Sweden Central deployment: text-to-video, status polling, result and
+authenticated download. NOT verified: the image-to-video route, and whether negative_prompt or
+audio inputs are accepted, so this client sends neither.
 """
-
-import json
+import threading
 import time
-import uuid
-import requests
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any
 
-from ..config import AZURE_FOUNDRY_RESOURCE_NAME
+import httpx
 
-# LTX-2.5 API endpoint
-LTX_API_BASE = f"https://{AZURE_FOUNDRY_RESOURCE_NAME}.services.ai.azure.com"
+from ..config import (
+    AZURE_FOUNDRY_API_KEY,
+    AZURE_FOUNDRY_RESOURCE_NAME,
+    LTX_DEPLOYMENT,
+    LTX_RESOLUTION,
+    LTX_TIMEOUT,
+)
 
-def get_foundry_token():
-    """Get Microsoft Entra ID token for Foundry authentication"""
+TOKEN_SCOPE = "https://cognitiveservices.azure.com/.default"
+POLL_SECONDS = 5
+
+_credential = None
+_cancel = threading.Event()   # set by interrupt() to stop the job being waited on
+_current_cancel_url: str | None = None
+
+
+class LtxError(RuntimeError):
+    pass
+
+
+def _base() -> str:
+    if not AZURE_FOUNDRY_RESOURCE_NAME:
+        raise LtxError("AZURE_FOUNDRY_RESOURCE_NAME is not set")
+    return f"https://{AZURE_FOUNDRY_RESOURCE_NAME}.services.ai.azure.com/providers/falai/v1/lightricks/ltx-2.5"
+
+
+def _headers() -> dict:
+    if AZURE_FOUNDRY_API_KEY:
+        return {"api-key": AZURE_FOUNDRY_API_KEY}
+    global _credential
     try:
         from azure.identity import DefaultAzureCredential
-        credential = DefaultAzureCredential()
-        token = credential.get_token("https://ai.azure.com/.default")
-        return token.token
-    except ImportError:
-        # Fallback for testing without Azure dependencies
-        return "TEST_TOKEN"
+    except ImportError as e:
+        raise LtxError("Set AZURE_FOUNDRY_API_KEY, or install azure-identity to use Entra ID") from e
+    if _credential is None:
+        _credential = DefaultAzureCredential()
+    try:
+        return {"Authorization": f"Bearer {_credential.get_token(TOKEN_SCOPE).token}"}
+    except Exception as e:  # azure-identity raises several types; all mean "no usable credential"
+        raise LtxError(f"No Azure credential available (set AZURE_FOUNDRY_API_KEY or run az login): {e}") from e
 
-def upload_file(path: Path, name: str | None = None) -> str:
-    """Upload a local file to Foundry storage (placeholder for now)"""
-    # For LTX-2.5, we'll pass the file content directly in the API call
-    # This is a placeholder for potential future file upload handling
-    return str(path)
 
-def generate_video(prompt: str, width: int, height: int, duration: int, 
-                   negative_prompt: str = "", audio_prompt: str = "") -> Dict[str, Any]:
-    """
-    Generate video using LTX-2.5 through Azure Foundry API
-    
-    Args:
-        prompt: Text prompt describing the video content
-        width: Output width in pixels
-        height: Output height in pixels
-        duration: Video duration in seconds
-        negative_prompt: What to avoid in generation
-        audio_prompt: Audio description for synchronized audio
-        
-    Returns:
-        Dictionary with generation result details
-    """
-    # Get authentication token
-    token = get_foundry_token()
-    
-    # Prepare API endpoint
-    endpoint = f"{LTX_API_BASE}/providers/falai/lightricks/ltx-2.5/text-to-video/fast"
-    
-    # Prepare request payload
-    payload = {
+def _check(r: httpx.Response) -> httpx.Response:
+    if r.is_error:
+        raise LtxError(f"LTX request failed: HTTP {r.status_code} {r.text[:500]}")
+    return r
+
+
+def generate(prompt: str, seconds: float, aspect_ratio: str, out: Path) -> Path:
+    """Text-to-video: render one clip of at least `seconds` and write it to `out`."""
+    global _current_cancel_url
+    _cancel.clear()
+    body = {
+        "model": LTX_DEPLOYMENT,
         "prompt": prompt,
-        "width": width,
-        "height": height,
-        "duration": duration,
-        "fps": 24,
-        "negative_prompt": negative_prompt,
-        "audio_prompt": audio_prompt if audio_prompt else prompt  # Use prompt as audio prompt if not specified
+        "duration": max(1, int(seconds) + (seconds % 1 > 0)),  # round up so the clip covers the scene
+        "resolution": LTX_RESOLUTION,
+        "aspect_ratio": aspect_ratio,
     }
-    
-    # Prepare headers
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    # Make API call
-    response = requests.post(endpoint, json=payload, headers=headers, timeout=300)
-    response.raise_for_status()
-    
-    return response.json()
+    with httpx.Client(timeout=60) as http:
+        job = _check(http.post(f"{_base()}/text-to-video/fast", json=body, headers=_headers())).json()
+        _current_cancel_url = job["cancel_url"]
+        try:
+            deadline = time.monotonic() + LTX_TIMEOUT
+            while True:
+                if _cancel.is_set():
+                    raise LtxError("stopped")
+                status = _check(http.get(job["status_url"], headers=_headers())).json()
+                state = status.get("status")
+                if state == "COMPLETED":
+                    break
+                if state not in ("IN_QUEUE", "IN_PROGRESS"):
+                    raise LtxError(f"LTX job {job['request_id']} ended as {state}: {str(status)[:500]}")
+                if time.monotonic() > deadline:
+                    _cancel_job(http, job["cancel_url"])
+                    raise LtxError(f"LTX job {job['request_id']} timed out after {LTX_TIMEOUT}s")
+                time.sleep(POLL_SECONDS)
+            video = _check(http.get(job["response_url"], headers=_headers())).json()["video"]
+            return _download(http, video["url"], out)
+        except LtxError as e:
+            if str(e) == "stopped":
+                _cancel_job(http, job["cancel_url"])
+            raise
+        finally:
+            _current_cancel_url = None
 
-def save_video(video_data: Dict[str, Any], output_path: Path) -> Path:
-    """
-    Save video from LTX-2.5 response to file
-    
-    Args:
-        video_data: Response from LTX-2.5 API
-        output_path: Path to save the video file
-        
-    Returns:
-        Path to saved video file
-    """
-    # This is a simplified approach - in practice, you'd need to handle
-    # the actual video URL or binary data from the API response
-    # For now, we'll create a placeholder
-    output_path.write_text(json.dumps(video_data, indent=2))
-    return output_path
 
-def run_ltx_workflow(prompt: str, width: int, height: int, duration: int,
-                     negative_prompt: str = "", audio_prompt: str = "",
-                     output_path: Path = None) -> Path:
-    """
-    Generate video using LTX-2.5 and save to output path
-    
-    This function mimics the ComfyUI.run() interface for compatibility
-    """
-    # Generate video
-    result = generate_video(prompt, width, height, duration, negative_prompt, audio_prompt)
-    
-    # Save result (this is where you'd actually handle the video file)
-    if output_path:
-        save_video(result, output_path)
-    
-    return output_path
+def _download(http: httpx.Client, url: str, out: Path) -> Path:
+    """Stream the mp4 to a temp file, then rename, so a failed download never leaves a broken clip."""
+    tmp = out.with_suffix(".part")
+    with http.stream("GET", url, headers=_headers(), timeout=300, follow_redirects=True) as r:
+        if r.is_error:
+            r.read()
+            raise LtxError(f"LTX download failed: HTTP {r.status_code} {r.text[:300]}")
+        with tmp.open("wb") as f:
+            for chunk in r.iter_bytes():
+                f.write(chunk)
+    tmp.replace(out)
+    return out
 
-def free():
-    """Placeholder for cleanup - LTX-2.5 doesn't need model unloading like ComfyUI"""
-    pass
 
-def interrupt():
-    """Placeholder for interruption - LTX-2.5 doesn't support interruption like ComfyUI"""
-    pass
+def _cancel_job(http: httpx.Client, url: str) -> None:
+    try:
+        http.put(url, headers=_headers())  # fal's cancel endpoint is a PUT; best effort
+    except Exception:
+        pass
+
+
+def free() -> None:
+    """Nothing to unload: the model runs in Azure."""
+
+
+def interrupt() -> None:
+    """Stop waiting on the running job (the poll loop sees this and cancels it in Azure)."""
+    _cancel.set()

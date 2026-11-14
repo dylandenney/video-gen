@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
-from .adapters import comfy
+from .adapters import comfy, ltx25
 from .config import JOBS_DIR
 from .jobs_io import read_json, write_json
 from .stages import analyze, lyrics, storyboard, keyframes, video, assemble
@@ -147,6 +147,7 @@ def stop(job_id: str) -> dict:
     if job["status"] == "running":
         _stopping.add(job_id)
         comfy.interrupt()
+        ltx25.interrupt()
     return job
 
 

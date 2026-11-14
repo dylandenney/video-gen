@@ -1,67 +1,42 @@
-# Testing LTX-2.5 Integration
+# LTX-2.5 integration (Azure Foundry)
 
-To test the LTX-2.5 integration with your musicvid project, follow these steps:
+Status: **text-to-video only**. The video stage sends each scene's prompt to LTX-2.5 Fast and downloads the clip.
+Keyframes are not used yet and singing scenes are not lip-synced (image-to-video and audio inputs are unverified).
 
-## Prerequisites
+## Azure setup
 
-1. **Install Azure SDK dependencies** (only needed if you want to use real Azure authentication):
-   ```bash
-   pip install azure-identity
-   ```
+- Foundry resource in **Sweden Central** (the only region LTX/fal is offered in), with `Fal-LTX-2.5-Fast` deployed.
+- A subscription owner must enable the `Microsoft.CognitiveServices/Fal.EnableDeploy` preview feature first.
+- fal models are third-party: prompts are processed by fal.ai as well as Azure. Check with IT before using company or customer content.
 
-2. **Set up Azure Foundry**:
-   - Deploy LTX-2.5 model in Azure Foundry
-   - Configure your Azure subscription with proper permissions
-   - Note your Foundry resource name
+## Configuration (`.env`, never committed)
 
-3. **Configure environment variables**:
-   ```bash
-   export AZURE_FOUNDRY_RESOURCE_NAME=your-resource-name
-   ```
+```env
+AZURE_FOUNDRY_RESOURCE_NAME=<resource name, the part before .services.ai.azure.com>
+AZURE_FOUNDRY_API_KEY=<optional; Keys and Endpoint page of the resource>
+```
 
-## Testing the Integration
+Optional: `LTX_DEPLOYMENT` (default `Fal-LTX-2.5-Fast`), `LTX_RESOLUTION` (default `1080p`), `LTX_TIMEOUT` (seconds per clip, default 900).
 
-1. **Run a test job with LTX-2.5**:
-   ```bash
-   # Set motion mode to 'draft' or 'final' to trigger LTX-2.5
-   curl -X POST http://localhost:8090/api/jobs \
-     -H "Content-Type: application/json" \
-     -d '{
-       "song": "test-song.mp3",
-       "params": {
-         "motion": "draft"
-       }
-     }'
-   ```
+Auth: with `AZURE_FOUNDRY_API_KEY` the app sends it as the `api-key` header (a `Bearer` key is rejected).
+Without it the app uses Entra ID through `azure-identity` (`az login`, or `AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_CLIENT_SECRET`).
+Inside Docker there is no `az login`, so use the key or a service principal.
 
-2. **Check logs**:
-   ```bash
-   docker compose logs -f api
-   ```
+## How the API behaves (verified)
 
-3. **Monitor the video generation stage**:
-   The video stage should now use LTX-2.5 instead of ComfyUI/Wan 2.2
+1. `POST /providers/falai/v1/lightricks/ltx-2.5/text-to-video/fast` with `model`, `prompt`, `duration`, `resolution`, `aspect_ratio` returns `request_id` and status URLs.
+2. Poll `status_url` until `COMPLETED` (about a minute for a 6 s clip).
+3. `GET response_url` returns `video.url`; download it with the same auth header (401 without).
+4. Output is 25 fps; a 16:9 `1080p` request gave 1920x1080.
 
-## Troubleshooting
+Not verified: image-to-video route/body, `negative_prompt`/audio inputs, 9:16 output size, durations other than 6 s.
 
-If you encounter issues:
+## Try it
 
-1. **Missing Azure dependencies**:
-   - The LTX-2.5 adapter has a fallback mechanism that uses a test token
-   - This allows you to test the integration without Azure setup
+```bash
+docker compose up -d --build        # ask first: the GPU is shared
+curl -X POST http://localhost:8090/api/jobs ...   # upload a song with motion=draft
+docker compose logs -f api
+```
 
-2. **API connection issues**:
-   - Verify your `AZURE_FOUNDRY_RESOURCE_NAME` is set correctly
-   - Ensure your Azure subscription has proper access to Foundry services
-
-3. **Test without Azure**:
-   - The system will fall back to a test token if Azure SDK is not installed
-   - This allows you to test the code structure without real API calls
-
-## Expected Behavior
-
-With LTX-2.5 integration:
-- Video generation will be synchronized with audio
-- Higher quality output (up to 4K resolution)
-- Faster generation times compared to Wan 2.2
-- 20-second clips per scene (vs 5-second clips with Wan 2.2)
+Each clip costs money per generation, so test with a short song section first. A failed call raises an error that includes the HTTP status and response text.
