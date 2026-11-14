@@ -22,3 +22,8 @@
 - Lip-sync A/B test: downloaded Demucs `htdemucs_ft` weights (~320 MB) to `musicvid/data/models/torch/hub/checkpoints`. Test only; the app uses `htdemucs`.
 - InfiniteTalk lip-sync test, approved: downloaded to `ComfyUI/models/` `diffusion_models/Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors` (16.6 GB, Apache-2.0, Kijai), `model_patches/wan2.1_infiniteTalk_single_fp16.safetensors` (5.1 GB, Apache-2.0, Comfy-Org), `audio_encoders/wav2vec2-chinese-base_fp16.safetensors` (0.19 GB, MIT; trained on WenetSpeech, terms unchecked). Uses ComfyUI's built-in InfiniteTalk nodes; no custom nodes or packages installed.
 - Lip sync switched from Wan 2.2 S2V to InfiniteTalk at 480p. S2V model and `wav2vec2_large_english_fp16` are no longer used by the app; deleted with approval (17 GB freed).
+
+## 2026-11-14
+- Hugging Face read token saved by the user to `~/.secrets/hf_token` (mode 600, folder 700). Not in any repo. `~/.cache/huggingface` is root-owned and was left alone.
+- LTX-2.5 local test, approved: downloading from the gated `Lightricks/LTX-2.5` repo to `ComfyUI/models/` (~39 GB): `diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors` (21.5 GB), `text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors` (15.4 GB), `vae/ltx-2.5-video-vae-bf16.safetensors` (1.5 GB), `vae/ltx-2.5-audio-vae-bf16.safetensors` (0.4 GB). Uses ComfyUI's built-in LTX nodes; nothing else installed.
+  **Licence flag:** LTX-2.x Community License, free only for entities under $10M annual revenue (affiliates included); above that a paid licence is needed. Route to the licensing contact before any business use.
