@@ -214,7 +214,7 @@ def start_worker() -> None:
 # Typical minutes on the DGX Spark with nothing else running, used until a stage has finished scenes to measure.
 FIXED = {"audio": 0.3, "lyrics": 0.5, "keyframes": 1.0, "video": 0.3, "assemble": 1.0}
 KEYFRAME = 0.6
-CLIP = {"stills": 0.0, "draft": 2.0, "final": 5.0}
+CLIP = {"stills": 0.0, "draft": 2.0, "final": 5.0, "ltx": 2.0}
 SINGING_CLIP = 4.0
 SCENE_SECONDS = 3.6  # average scene length, to guess the scene count before a storyboard exists
 OUTPUTS = {"keyframes": ("keyframes", "[0-9][0-9].png"), "video": ("clips", "[0-9][0-9].mp4")}
@@ -226,7 +226,7 @@ def typical(stage: str, scenes: int, singing: int, motion: str) -> float:
     if stage == "keyframes":
         return FIXED[stage] + scenes * KEYFRAME
     if stage == "video":
-        return 0.0 if motion == "stills" else FIXED[stage] + (scenes - singing) * CLIP[motion] + singing * SINGING_CLIP
+        return 0.0 if motion == "stills" else FIXED[stage] + (scenes - singing) * CLIP[motion] + singing * (CLIP[motion] if motion == "ltx" else SINGING_CLIP)
     return FIXED[stage]
 
 

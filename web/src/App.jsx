@@ -225,6 +225,7 @@ function Job({ id, onChange, onDeleted }) {
               <option value="stills">Stills with camera moves (fastest)</option>
               <option value="draft">Draft video (Wan 5B, lower res, with lip sync)</option>
               <option value="final">Final video (Wan 14B, slowest)</option>
+              <option value="ltx">LTX-2.5 video (high res, fast, with lip sync)</option>
             </select>
           </label>
           <label title="Every scene with singing becomes a lip-synced shot of the singer, from changing angles"><input type="checkbox" checked={!!form.performance} onChange={(e) => setForm({ ...form, performance: e.target.checked })} /> Performance (singer on camera)</label>

@@ -1,12 +1,14 @@
-"""Stage 5: animate each keyframe into a clip with LTX-2.5 video generation.
-
-LTX-2.5 provides synchronized audio-video generation with better quality and performance
-than the previous Wan 2.2 setup. It generates 20-second clips at 24fps with audio synchronization.
+"""Stage 5: animate each keyframe into a clip with Wan 2.2 image-to-video.
 
 Motion modes (job param "motion"):
   stills - no video model; assembly animates the keyframes with camera moves
-  draft  - LTX-2.5 fast mode, 1080x1920 @ 24 fps (9:16 aspect ratio)
-  final  - LTX-2.5 fast mode, 1080x1920 @ 24 fps (higher quality output)
+  draft  - Wan 2.2 TI2V 5B, 544x960 @ 24 fps (below its native 704x1280, for about 2x faster previews)
+  final  - Wan 2.2 I2V 14B + 4-step LoRAs, 720x1280 @ 16 fps, FILM-interpolated to 32 fps
+  ltx    - LTX-2.5 22B distilled, 704x1280 @ 24 fps, 8 steps (about 2 min a clip). Singing scenes get the
+           vocals as an audio input and lip-sync to them in the same model.
+In draft and final, scenes marked "singing" use InfiniteTalk (Wan 2.1 I2V 14B 480p + InfiniteTalk patch,
+6 steps, 480x832 @ 25 fps) lip-synced to the isolated vocals. It beat Wan 2.2 S2V on expression in testing,
+and 720p looked no better than 480p at over 4x the time.
 
 Clips are generated a little longer than their scene; assembly trims them.
 Writes clips/NN.mp4.
@@ -22,24 +24,28 @@ import torch
 from demucs.apply import apply_model
 from demucs.pretrained import get_model
 
-from ..adapters import ltx25, comfy
+from ..adapters import comfy
 from ..config import oriented
 from ..jobs_io import read_json
 
 NEGATIVE = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，"
             "多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走")
 
-# LTX-2.5 modes (both draft and final use same parameters for simplicity)
+# workflow, width, height (portrait; swapped for 16:9), model fps
 MODES = {
-    "draft": (1080, 1920, 24),  # 9:16 aspect ratio
-    "final": (1080, 1920, 24),  # 9:16 aspect ratio
+    "draft": ("wan22_ti2v_5b", 544, 960, 24),
+    "final": ("wan22_i2v_14b", 720, 1280, 16),
+    "ltx": ("ltx25_i2v", 704, 1280, 24),
 }
+LTX_SINGING = ("ltx25_ia2v", 704, 1280, 24)
+# Lip-synced singing scenes (InfiniteTalk), same size in every mode.
+SINGING = ("wan21_infinitetalk", 480, 832, 25)
 VOCAL_RMS = 0.15  # level of the clear-sounding vocals in testing
 
 
-def frames_for(seconds: float, fps: int) -> int:
-    """LTX-2.5 needs 4k+1 frames; round up so the clip covers the whole scene."""
-    return 4 * math.ceil(seconds * fps / 4) + 1
+def frames_for(seconds: float, fps: int, step: int = 4) -> int:
+    """Wan needs 4k+1 frames, LTX 8k+1; round up so the clip covers the whole scene."""
+    return step * math.ceil(seconds * fps / step) + 1
 
 
 def isolate_vocals(d: Path) -> Path:
@@ -64,14 +70,14 @@ def separate_vocals(src: Path, path: Path) -> None:
 
 def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
     """Animate one scene's keyframe into clips/NN.mp4. Singing scenes are lip-synced to the vocals."""
-    w, h, fps = MODES[mode]
+    workflow, w, h, fps = MODES[mode]
     image = comfy.upload(d / "keyframes" / f'{s["index"]:02d}.png')
     prompt = f'{s["description"]} {s["motion"]}. Camera: {s["camera"]}. {board["visual_style"]}. Cinematic, natural motion.'
     # Extra 0.6 s covers the longest transition overlap into the next scene (see assemble.TRANSITIONS).
     seconds = s["end"] - s["start"] + 0.6
-    audio = ""
+    audio = None
     if s.get("singing") and s["characters"]:
-        # For singing scenes, we can pass the audio prompt to LTX-2.5
+        workflow, w, h, fps = LTX_SINGING if mode == "ltx" else SINGING
         vocals, sr = sf.read(isolate_vocals(d))
         part = d / "clips" / f'{s["index"]:02d}_vocals.wav'
         seg = vocals[int(s["start"] * sr):int((s["start"] + seconds) * sr)]
@@ -79,21 +85,12 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
         rms, peak = np.sqrt(np.mean(seg ** 2)), np.abs(seg).max()
         gain = min(VOCAL_RMS / rms, 0.99 / peak) if peak > 0 else 1.0  # without clipping
         sf.write(part, seg * gain, sr)
-        # LTX-2.5 can handle audio prompts, so we'll pass the vocals as audio prompt
-        audio_prompt = f"The person sings these words with emotion, mouth clearly following the vocals. {prompt}"
-        prompt = audio_prompt
+        audio = comfy.upload(part)
+        prompt = f'The person sings these words with emotion, mouth clearly following the vocals. {prompt}'
     w, h = oriented(w, h, board.get("aspect", "9:16"))
-    
-    # Use LTX-2.5 for video generation instead of ComfyUI
-    ltx25.run_ltx_workflow(
-        prompt=prompt,
-        width=w,
-        height=h,
-        duration=int(seconds),
-        negative_prompt=NEGATIVE,
-        audio_prompt=audio,
-        output_path=d / "clips" / f'{s["index"]:02d}.mp4'
-    )
+    length = frames_for(seconds, fps, 8 if mode == "ltx" else 4)
+    comfy.run(comfy.fill(workflow, image=image, audio=audio, prompt=prompt, negative=NEGATIVE, width=w, height=h,
+                         length=length, seconds=length / fps, seed=s["seed"]), d / "clips" / f'{s["index"]:02d}.mp4')
 
 
 def run(d: Path, job: dict) -> None:
@@ -114,4 +111,4 @@ def run(d: Path, job: dict) -> None:
             if not (resume and clip.is_file() and clip.stat().st_mtime > frame.stat().st_mtime):
                 render_clip(d, board, s, mode)
     finally:
-        ltx25.free()
+        comfy.free()
