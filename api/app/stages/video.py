@@ -81,6 +81,12 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
         vocals, sr = sf.read(isolate_vocals(d))
         part = d / "clips" / f'{s["index"]:02d}_vocals.wav'
         seg = vocals[int(s["start"] * sr):int((s["start"] + seconds) * sr)]
+        if mode == "ltx":
+            # LTX spreads the audio over the whole clip, so it must be exactly the clip's length
+            # (rounded up to 8k+1 frames) or the mouth drifts behind the words. Pad with the following vocals.
+            n = int(frames_for(seconds, fps, 8) / fps * sr)
+            seg = vocals[int(s["start"] * sr):int(s["start"] * sr) + n]
+            seg = np.concatenate([seg, np.zeros((n - len(seg),) + seg.shape[1:])])
         # Same level for every song: quiet vocals gave the lip-sync model a weak signal and loose mouth shapes.
         rms, peak = np.sqrt(np.mean(seg ** 2)), np.abs(seg).max()
         gain = min(VOCAL_RMS / rms, 0.99 / peak) if peak > 0 else 1.0  # without clipping
