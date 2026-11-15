@@ -124,6 +124,8 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # A storyboard "medium shot" next to this close-up made the model draw the character twice, once at each size.
         shot = re.sub(r"\b(extreme |very )?(wide|medium|long|full[- ]body|establishing|low-angle|high-angle) (shot|view)\b", "close-up", shot, flags=re.I)
         shot = re.sub(r"[^.]*\b(lower|higher|small) in the frame\b[^.]*\.", "", shot, flags=re.I)
+        # "close-up looking up at the alien" drew a second, human onlooker doing the looking.
+        shot = re.sub(r"\b(looking|gazing|peering) (up|down) at\b", "of", shot, flags=re.I)
         shot = f"Head-and-shoulders close-up of {lead} standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
