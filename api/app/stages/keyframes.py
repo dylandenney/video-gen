@@ -121,8 +121,11 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
     if "sing" in shot.lower() and "microphone" not in shot.lower() and " mic" not in shot.lower():
-        # Without this the image model adds microphone stands to anyone singing.
+        # The image model adds a microphone stand to anyone called a singer, even when told otherwise,
+        # so call them musicians and redraw any take that still has one.
+        shot = re.sub(r"\bsingers\b", "musicians", re.sub(r"\bsinger\b", "musician", shot))
         shot += " Everyone sings unamplified into the open air, faces and mouths fully unobstructed, only the landscape around them."
+        extra["unwanted_microphone"] = "is there a microphone or microphone stand anywhere in the image?"
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
