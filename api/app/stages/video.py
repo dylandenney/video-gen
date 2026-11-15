@@ -50,9 +50,11 @@ def frames_for(seconds: float, fps: int, step: int = 4) -> int:
 
 def isolate_vocals(d: Path) -> Path:
     """vocals.wav: the singing from clip.wav."""
-    path = d / "vocals.wav"
-    if not path.is_file():
-        separate_vocals(d / "clip.wav", path)
+    path, clip = d / "vocals.wav", d / "clip.wav"
+    # Remade whenever the clip is newer: resuming after a new section kept the old section's vocals,
+    # so singers lip-synced to the wrong words.
+    if not path.is_file() or path.stat().st_mtime < clip.stat().st_mtime:
+        separate_vocals(clip, path)
     return path
 
 
