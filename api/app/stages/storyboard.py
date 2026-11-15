@@ -292,11 +292,14 @@ def run(d: Path, job: dict) -> None:
     board["characters"] = list(by_id.values())
 
     known = set(by_id)
+    # Voice matching only picks between a man and a woman; with one gender on screen a high male voice
+    # (rap, belting) read as female would switch off every lip sync.
+    mixed = {gender_of(c["appearance"]) for c in by_id.values()} >= {"male", "female"}
     board["scenes"] = [
         {**by_index[s["index"]], **{k: v for k, v in s.items() if k not in ("sing", "voice")},
          "characters": (chars := [c for c in by_index[s["index"]]["characters"] if c in known]),
          "singing": s["sing"] and len(chars) == 1  # lip sync follows one face
-                    and (not s.get("voice") or gender_of(by_id[chars[0]]["appearance"]) in ("", s["voice"])),
+                    and (not mixed or not s.get("voice") or gender_of(by_id[chars[0]]["appearance"]) in ("", s["voice"])),
          "seed": int(job["id"][:8], 16) + s["index"]}  # scene edits bump this to get a new take
         for s in slots
     ]

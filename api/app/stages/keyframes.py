@@ -133,6 +133,11 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
         who = "; ".join(f"{chars[cid]['name']} is the person in image {n + 1}, looking and dressed exactly as described: {chars[cid]['appearance']}"
                         for n, cid in enumerate(refs))
+        # Close-ups sometimes came back with an oversized, doll-like head; the checker could not spot it.
+        shot += " Natural adult proportions, head in normal scale to the shoulders and body."
+        # Action words like "spinning" made the model add a twirling skirt over jeans.
+        extra["wrong_clothes"] = ("these clothes are wanted: " + " ".join(chars[cid]["appearance"] for cid in refs)
+                                  + " Is anyone wearing a garment that is not described there, such as a skirt or dress added over trousers?")
         if len(refs) > 1:
             people = " ".join(f"{chars[cid]['name']}: {chars[cid]['appearance']}" for cid in refs)
             extra["swapped_outfits"] = f"these people should appear: {people} Is anyone wearing clothes described for a different person?"
