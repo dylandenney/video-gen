@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import angles, characters, export, jobs
-from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, WEB_DIR, WHISPER_MODEL
+from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, TRAINING_DIR, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
 from .stages import lyrics
 from .stages.analyze import ffmpeg, song_overview
@@ -412,6 +412,27 @@ def character_sheet(cid: str):
     get_character(cid)
     path = characters.char_dir(cid) / "sheet.png"
     if not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path)
+
+
+
+@app.get("/api/training")
+def training_runs() -> list[dict]:
+    """LoRA training runs with their sample videos and checkpoints, newest step first."""
+    if not TRAINING_DIR.is_dir():
+        return []
+    return [{"name": run.name,
+             "samples": sorted((f.name for f in (run / "samples").glob("*.mp4")), reverse=True),
+             "checkpoints": sorted((f.name for f in (run / "checkpoints").glob("*.safetensors")), reverse=True)}
+            for run in sorted(TRAINING_DIR.iterdir()) if run.is_dir()]
+
+
+@app.get("/api/training/{run}/samples/{name}")
+def training_sample(run: str, name: str):
+    base = (TRAINING_DIR / run / "samples").resolve()
+    path = (base / name).resolve()
+    if path.parent != base or path.suffix != ".mp4" or not path.is_file() or not base.is_relative_to(TRAINING_DIR.resolve()):
         raise HTTPException(404)
     return FileResponse(path)
 

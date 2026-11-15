@@ -10,6 +10,7 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:27b")
 VISION_MODEL = os.environ.get("VISION_MODEL", "qwen2.5vl:7b")
 # Keyframe checks: the 7B model passed backwards heads, doubled microphones and collages that this one caught.
 QC_MODEL = os.environ.get("QC_MODEL", "qwen3.5:27b")
+TRAINING_DIR = Path(os.environ.get("TRAINING_DIR", "/training"))
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
 
 # Empty = lyric alignment disabled (no model download). e.g. "large-v3-turbo"

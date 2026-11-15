@@ -14,7 +14,9 @@ services:
       OUTPUT_WIDTH: ${OUTPUT_WIDTH:-1080}
       OUTPUT_HEIGHT: ${OUTPUT_HEIGHT:-1920}
       OUTPUT_FPS: ${OUTPUT_FPS:-30}
+      TRAINING_DIR: /training               # LTX LoRA runs, shown on the Training page
     user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - ./data:/data
+      - ${TRAINING_OUTPUTS:-~/ltx-trainer/outputs}:/training:ro
     restart: unless-stopped

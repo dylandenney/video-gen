@@ -61,6 +61,7 @@ export default function App() {
           <input type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac,.ogg" onChange={upload} hidden />
         </label>
         <button className={current === "characters" ? "active" : ""} onClick={() => setCurrent("characters")}>Characters</button>
+        <button className={current === "training" ? "active" : ""} onClick={() => setCurrent("training")}>Training</button>
         {error && <p className="error">{error}</p>}
         <ul className="jobs">
           {jobs.map((j) => (
@@ -78,7 +79,7 @@ export default function App() {
           </p>
         )}
       </aside>
-      <main>{current === "characters" ? <Characters /> : current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
+      <main>{current === "characters" ? <Characters /> : current === "training" ? <Training /> : current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
     </div>
   );
 }
@@ -640,4 +641,32 @@ function CharacterCard({ c, act, json }) {
       )}
     </figure>
   );
+}
+
+
+function Training() {
+  const [runs, setRuns] = useState(null);
+  useEffect(() => {
+    const load = () => api("/training").then(setRuns).catch(() => setRuns([]));
+    load();
+    const t = setInterval(load, 60000);  // new samples land every few hundred steps
+    return () => clearInterval(t);
+  }, []);
+  if (!runs) return <p className="muted">Loading…</p>;
+  if (!runs.length) return <p className="muted">No training runs yet.</p>;
+  const step = (name) => Number(name.match(/step_0*(\d+)/)?.[1] ?? 0);
+  return runs.map((r) => (
+    <section key={r.name}>
+      <h2>{r.name}</h2>
+      <p className="muted">Checkpoints: {r.checkpoints.length ? r.checkpoints.join(", ") : "none yet"}</p>
+      <div className="scenes">
+        {r.samples.map((f) => (
+          <article key={f}>
+            <video src={`/api/training/${r.name}/samples/${f}`} controls preload="metadata" />
+            <header>Step {step(f)} · sample {f.match(/_(\d+)\.mp4$/)?.[1]}</header>
+          </article>
+        ))}
+      </div>
+    </section>
+  ));
 }
