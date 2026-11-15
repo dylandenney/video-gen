@@ -138,7 +138,8 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # Bald characters (aliens, robots, shaved heads) came back with wispy hair in close-ups.
         bald = [chars[cid]["name"] for cid in refs if re.search(r"\b(bald|hairless|no (visible )?hair)\b", chars[cid]["appearance"], re.I)]
         if bald:
-            shot += f" {' and '.join(bald)} {'is' if len(bald) == 1 else 'are'} completely bald, with no hair at all."
+            # Say it about the head, not "completely bald": that phrase made the model add a bald man beside an alien.
+            shot += " " + " ".join(f"{n}'s head is smooth and hairless." for n in bald)
             extra["unwanted_hair"] = f"{' and '.join(bald)} should be completely bald. Does any of them have hair on the head?"
         # Action words like "spinning" made the model add a twirling skirt over jeans.
         extra["wrong_clothes"] = ("these clothes are wanted: " + " ".join(chars[cid]["appearance"] for cid in refs)
