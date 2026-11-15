@@ -27,3 +27,8 @@
 - Hugging Face read token saved by the user to `~/.secrets/hf_token` (mode 600, folder 700). Not in any repo. `~/.cache/huggingface` is root-owned and was left alone.
 - LTX-2.5 local test, approved: downloading from the gated `Lightricks/LTX-2.5` repo to `ComfyUI/models/` (~39 GB): `diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors` (21.5 GB), `text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors` (15.4 GB), `vae/ltx-2.5-video-vae-bf16.safetensors` (1.5 GB), `vae/ltx-2.5-audio-vae-bf16.safetensors` (0.4 GB). Uses ComfyUI's built-in LTX nodes; nothing else installed.
   **Licence flag:** LTX-2.x Community License, free only for entities under $10M annual revenue (affiliates included); above that a paid licence is needed. Route to the licensing contact before any business use.
+
+## 2026-11-15 — LTX trainer install test
+- Cloned github.com/Lightricks/LTX-2 (depth 1) to `~/ltx-trainer/LTX-2`; uv 0.13.8 in `~/ltx-trainer/.tools` venv; `uv sync` → `~/ltx-trainer/LTX-2/.venv` (torch 2.13.0+cu132, triton 3.7.1, bitsandbytes 0.50.2). Separate from ComfyUI and the app.
+- ARM64 check passed on GB10 (sm 12.1): CUDA bf16 matmul, Triton kernel, bitsandbytes 8-bit AdamW, `import ltx_trainer`.
+- No models downloaded. Remove by deleting `~/ltx-trainer`.
