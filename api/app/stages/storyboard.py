@@ -136,9 +136,11 @@ Reply with JSON only."""
 def describe_photo(path: Path) -> str:
     """Appearance of the person in a cast photo, from the local vision model."""
     return ollama.chat(VISION_MODEL, [{"role": "user", "images": [ollama.image_b64(path)], "content": (
-        "Describe the main person in this photo for a film casting sheet, in one paragraph: apparent age range, "
-        "gender presentation, build, skin tone, face shape and features, eye color, hair color/length/style, facial hair, "
-        "and clothing. Visual facts only; do not guess who they are.")}], temperature=0.2)
+        "Describe the main character in this picture for a film casting sheet, in one paragraph. First say what it is "
+        "(a real person, or a creature, alien, animal or robot) and how the picture is made (photograph, 3D animated "
+        "render, or 2D drawing). Then: size and body proportions (for example a head large for a small body), apparent "
+        "age and gender presentation if human, skin or surface color, face shape and features, exact eye color and shape, "
+        "hair, and clothing. Visual facts only, exactly as shown; do not guess who they are.")}], temperature=0.2)
 
 
 AGES = ["early 20s", "mid 20s", "late 20s", "early 30s", "mid 30s", "late 30s", "early 40s"]

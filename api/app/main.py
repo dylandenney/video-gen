@@ -16,6 +16,7 @@ from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, TRAINING_DIR, WEB_DIR, 
 from .jobs_io import read_json, write_json
 from .adapters import comfy
 from .stages import lyrics
+from .stages.keyframes import LOOKS
 from .stages.analyze import ffmpeg, song_overview
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -338,7 +339,8 @@ def add_library_cast(job_id: str, cid: str) -> dict:
 
     look = c.get("look", "realistic")
     # Tell the storyboard the drawing style so the video's look can match the character.
-    appearance = c["appearance"] + ("" if look == "realistic" else f" Drawn in {look} style.")
+    # "cartoon" alone made the storyboard pick flat 2D neon art for a 3D-rendered sheet; give it the sheet's exact finish.
+    appearance = c["appearance"] + ("" if look == "realistic" else f" Art style: {LOOKS[look][1]}.")
     return add_to_cast(job_id, c["name"], copy, appearance, {k: c[k] for k in ("lora", "trigger") if c.get(k)})
 
 
