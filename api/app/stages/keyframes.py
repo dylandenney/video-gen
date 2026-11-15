@@ -51,7 +51,7 @@ QC_QUESTIONS = {
 
 
 # Flags the checker raised on most normal-looking images in testing: shown as notes, never a reason to redraw.
-NOTE_ONLY = {"distorted_face", "extra_limbs", "twisted_body", "unnatural_pose"}
+NOTE_ONLY = {"distorted_face", "extra_limbs", "twisted_body", "unnatural_pose", "human_face"}
 
 
 def serious(problems: list[str]) -> list[str]:
