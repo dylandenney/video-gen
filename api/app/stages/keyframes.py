@@ -40,9 +40,9 @@ QC_QUESTIONS = {
     "ghost_or_double_exposure": "is any person semi-transparent, overlaid or faded into the scene?",
     # No hands question: the checker flagged normal hands in most frames, so every image would be redrawn.
     "distorted_face": "is any face warped?",
-    "garbled_text": "is there unreadable text?",
+    "garbled_text": "is there unreadable written text, such as a sign, caption, label or screen with letters on it?",
     "twisted_body": "does anyone's face point the opposite way from their body, like a face on the back of the head or a front-facing face above a back view?",
-    "duplicate_props": "does anyone hold or stand at two of something meant to be single, like two microphones?",
+    "duplicate_props": "does one single person hold or stand at two of the same object, like one person with two microphones or two guitars?",
     "extra_limbs": "does anyone have extra or missing arms, legs, feet or shoes, or limbs joined wrongly?",
     "unnatural_pose": "is anyone standing or sitting in a physically impossible or twisted pose?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
@@ -120,6 +120,9 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         shot = f"Head-and-shoulders close-up of the singer standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
+    if "microphone" not in shot.lower() and " mic" not in shot.lower():
+        # Without this the image model adds microphone stands to anyone singing.
+        shot += " The open space in front of everyone's face is clear, with no microphones, stands or equipment."
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
