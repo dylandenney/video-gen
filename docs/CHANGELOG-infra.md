@@ -32,3 +32,4 @@
 - Cloned github.com/Lightricks/LTX-2 (depth 1) to `~/ltx-trainer/LTX-2`; uv 0.13.8 in `~/ltx-trainer/.tools` venv; `uv sync` → `~/ltx-trainer/LTX-2/.venv` (torch 2.13.0+cu132, triton 3.7.1, bitsandbytes 0.50.2). Separate from ComfyUI and the app.
 - ARM64 check passed on GB10 (sm 12.1): CUDA bf16 matmul, Triton kernel, bitsandbytes 8-bit AdamW, `import ltx_trainer`.
 - No models downloaded. Remove by deleting `~/ltx-trainer`.
+- Downloaded to `~/ltx-trainer/models/` (from Lightricks/LTX-2.5, for training only): `ltx-2.5-22b-dev-transformer-bf16.safetensors` (42.0 GB), `gemma4-12b-with-proj-ltx-2.5-bf16.safetensors` (26.3 GB). VAEs reused from ComfyUI `models/vae/` (no duplicates).
