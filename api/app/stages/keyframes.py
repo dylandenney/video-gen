@@ -50,6 +50,14 @@ QC_QUESTIONS = {
 }
 
 
+# Flags the checker raised on most normal-looking images in testing: shown as notes, never a reason to redraw.
+NOTE_ONLY = {"distorted_face", "extra_limbs", "twisted_body", "unnatural_pose"}
+
+
+def serious(problems: list[str]) -> list[str]:
+    return [p for p in problems if p not in NOTE_ONLY]
+
+
 def check(path: Path, extra: dict[str, str], people: int | None = None) -> list[str]:
     """Defects the local vision model sees in a keyframe; empty means it looks fine.
 
@@ -151,11 +159,11 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         comfy.run(graph, take)
         problems = check(take, extra, len(refs) if refs else None)
         takes.append(problems)
-        if not problems:
+        if not serious(problems):
             break
         log.info("scene %d attempt %d rejected: %s", s["index"], attempt + 1, "; ".join(problems))
     # Keep the take with the fewest problems (the first clean one if any); the scene editor can redo it.
-    best = min(range(len(takes)), key=lambda n: len(takes[n]))
+    best = min(range(len(takes)), key=lambda n: (len(serious(takes[n])), len(takes[n])))
     for n in range(len(takes)):
         take = path.with_name(f"{path.stem}_take{n}.png")
         take.replace(path) if n == best else take.unlink()
