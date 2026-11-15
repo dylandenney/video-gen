@@ -87,6 +87,9 @@ def sheet_graph(name: str, appearance: str, seed: int, look: str = "realistic") 
         f"neutral expression, plain light grey studio background, soft even light, {finish}."))
 
 
+# The storyboard often repeats a look in image_prompt that `who` also gives; without a count the edit model drew that person twice.
+COUNT = {1: "Exactly one person is in the frame.", 2: "Exactly two people are in the frame.", 3: "Exactly three people are in the frame."}
+
 ANGLE_SHOT = {
     "left_three_quarter": "three-quarter view, their face turned toward the left side of the frame",
     "right_three_quarter": "three-quarter view, their face turned toward the right side of the frame",
@@ -138,7 +141,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         if refs:
             graph = comfy.fill("qwen_image_edit", width=w, height=h, seed=seed,
                                image1=images[0], image2=images[1], image3=images[2], prompt=(
-                f'Create a new cinematic film still, {COMPOSITION[aspect]}: {shot} {who}. '
+                f'Create a new cinematic film still, {COMPOSITION[aspect]}: {shot} {who}. {COUNT[len(refs)]} '
                 f"Keep each person's face, hair and body exactly as in their reference image; "
                 f"do not copy the background of the reference images. {style}."))
         else:
