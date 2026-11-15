@@ -14,6 +14,7 @@ Clips are generated a little longer than their scene; assembly trims them.
 Writes clips/NN.mp4.
 """
 import math
+import re
 import shutil
 from pathlib import Path
 
@@ -97,8 +98,18 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
         prompt = f'The person sings these words with emotion, mouth clearly following the vocals. {prompt}'
     w, h = oriented(w, h, board.get("aspect", "9:16"))
     length = frames_for(seconds, fps, 8 if mode == "ltx" else 4)
-    comfy.run(comfy.fill(workflow, image=image, audio=audio, prompt=prompt, negative=NEGATIVE, width=w, height=h,
-                         length=length, seconds=length / fps, seed=s["seed"]), d / "clips" / f'{s["index"]:02d}.mp4')
+    graph = comfy.fill(workflow, image=image, audio=audio, prompt=prompt, negative=NEGATIVE, width=w, height=h,
+                       length=length, seconds=length / fps, seed=s["seed"])
+    chars = {c["id"]: c for c in board["characters"]}
+    # A character LoRA (trained on LTX) keeps that person consistent through the clip; one per clip, the first in the scene.
+    if mode == "ltx" and (c := next((chars[i] for i in s["characters"] if chars.get(i, {}).get("lora")), None)):
+        comfy.add_lora(graph, c["lora"])
+        node = next(n for n in graph.values() if n["class_type"] == "CLIPTextEncode" and n["inputs"]["text"] == prompt)
+        # Name them the way the training captions did ("the woman" -> "aia woman"), else lead with the trigger.
+        noun = c["trigger"].split()[-1]
+        text, n = re.subn(rf"\b(the|a) {re.escape(noun)}\b", c["trigger"], prompt, flags=re.I)
+        node["inputs"]["text"] = text if n else f'{c["trigger"]}. {prompt}'
+    comfy.run(graph, d / "clips" / f'{s["index"]:02d}.mp4')
 
 
 def run(d: Path, job: dict) -> None:

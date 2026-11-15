@@ -288,6 +288,7 @@ def run(d: Path, job: dict) -> None:
     by_id = {c["id"]: c for c in board["characters"]}
     for c in cast:
         by_id[c["id"]] = {"id": c["id"], "name": c["name"], "appearance": c["description"], "photo": c["photo"],
+                          **{k: c[k] for k in ("lora", "trigger") if c.get(k)},
                           **({"angles": c["angles"]} if c.get("angles") else {})}
     board["characters"] = list(by_id.values())
 

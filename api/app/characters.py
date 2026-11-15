@@ -86,6 +86,12 @@ def redo(cid: str, name: str, appearance: str, look: str) -> dict:
     return _in_background(c, "rendering", _render)
 
 
+def set_lora(cid: str, lora: str, trigger: str) -> dict:
+    """LTX LoRA trained on this character, used for their scenes in LTX videos; empty lora clears it."""
+    c = {k: v for k, v in load(cid).items() if k not in ("lora", "trigger")}
+    return _save({**c, "lora": lora, "trigger": trigger} if lora else c)
+
+
 def from_photo(name: str, png: Path) -> dict:
     c, d = _new(name, "", "photo")
     shutil.move(png, d / "sheet.png")

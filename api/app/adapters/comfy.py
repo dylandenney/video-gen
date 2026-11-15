@@ -88,3 +88,19 @@ def free() -> None:
 def interrupt() -> None:
     """Stop the prompt ComfyUI is running now; the waiting run() call then raises."""
     httpx.post(f"{COMFY_URL}/interrupt", timeout=30)
+
+
+def loras() -> list[str]:
+    info = httpx.get(f"{COMFY_URL}/object_info/LoraLoaderModelOnly", timeout=30).json()
+    return info["LoraLoaderModelOnly"]["input"]["required"]["lora_name"][0]
+
+
+def add_lora(graph: dict, name: str, strength: float = 1.0) -> dict:
+    """Put a LoRA between the graph's UNETLoader and everything that uses its model."""
+    unet = next(k for k, n in graph.items() if n["class_type"] == "UNETLoader")
+    for n in graph.values():
+        for key, val in n["inputs"].items():
+            if isinstance(val, list) and val[:1] == [unet]:
+                n["inputs"][key] = ["lora", val[1]]
+    graph["lora"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"model": [unet, 0], "lora_name": name, "strength_model": strength}}
+    return graph

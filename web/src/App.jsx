@@ -611,6 +611,7 @@ function Characters() {
 
 function CharacterCard({ c, act, json }) {
   const [edit, setEdit] = useState(null);
+  const [lora, setLora] = useState(null);
   const busy = BUSY[c.status];
   return (
     <figure>
@@ -630,10 +631,27 @@ function CharacterCard({ c, act, json }) {
         <figcaption>
           <b>{c.name}</b>{c.source === "photo" ? " (photo)" : c.look && c.look !== "realistic" ? ` (${c.look})` : ""}: {c.appearance}
           {c.status === "failed" && <span className="error"> Failed: {c.error}</span>}
+          {c.lora && <><br /><small>Video LoRA: {c.lora} · trigger “{c.trigger}”</small></>}
+          {lora && (
+            <div className="field">
+              <select value={lora.lora} onChange={(e) => setLora({ ...lora, lora: e.target.value })}>
+                <option value="">none</option>
+                {lora.options.map((n) => <option key={n}>{n}</option>)}
+              </select>
+              <input type="text" placeholder="Trigger word it was trained with, e.g. aia woman" value={lora.trigger}
+                onChange={(e) => setLora({ ...lora, trigger: e.target.value })} />
+              <div className="row">
+                <button className="primary" onClick={() => act(() => api(`/characters/${c.id}/lora`, json("PUT", { lora: lora.lora, trigger: lora.trigger })).then(() => setLora(null)))}>Save</button>
+                <button onClick={() => setLora(null)}>Cancel</button>
+              </div>
+              <p className="muted">Used for this character's scenes in LTX videos cast from the library after saving.</p>
+            </div>
+          )}
           {!busy && (
             <div className="row">
               <button className="link" onClick={() => setEdit({ name: c.name, appearance: c.appearance, look: c.look || "realistic" })}>edit</button>
               {c.source !== "photo" && <button className="link" onClick={() => act(() => api(`/characters/${c.id}`, json("PUT", { name: c.name, appearance: c.appearance, look: c.look || "realistic" })))}>new take</button>}
+              <button className="link" onClick={() => act(() => api("/loras").then((options) => setLora({ lora: c.lora || "", trigger: c.trigger || "", options })))}>video LoRA</button>
               <button className="link" onClick={() => confirm(`Delete ${c.name}?`) && act(() => api(`/characters/${c.id}`, { method: "DELETE" }))}>delete</button>
             </div>
           )}

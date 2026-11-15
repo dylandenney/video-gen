@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from . import angles, characters, export, jobs
 from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, TRAINING_DIR, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
+from .adapters import comfy
 from .stages import lyrics
 from .stages.analyze import ffmpeg, song_overview
 
@@ -275,7 +276,7 @@ def to_png(data: bytes, folder: Path, name: str) -> Path:
     return folder / name
 
 
-def add_to_cast(job_id: str, name: str, make_photo, appearance: str | None = None) -> dict:
+def add_to_cast(job_id: str, name: str, make_photo, appearance: str | None = None, lora: dict | None = None) -> dict:
     """Append a cast entry; make_photo(folder, filename) writes its PNG into the job's cast folder
     and may return {angle: file name} of extra angle photos."""
     job = get_job(job_id)
@@ -290,6 +291,8 @@ def add_to_cast(job_id: str, name: str, make_photo, appearance: str | None = Non
         entry["angles"] = views
     if appearance:
         entry["appearance"] = appearance
+    if lora:
+        entry.update(lora)
     return jobs.update(job_id, cast=[*cast, entry])
 
 
@@ -336,7 +339,7 @@ def add_library_cast(job_id: str, cid: str) -> dict:
     look = c.get("look", "realistic")
     # Tell the storyboard the drawing style so the video's look can match the character.
     appearance = c["appearance"] + ("" if look == "realistic" else f" Drawn in {look} style.")
-    return add_to_cast(job_id, c["name"], copy, appearance)
+    return add_to_cast(job_id, c["name"], copy, appearance, {k: c[k] for k in ("lora", "trigger") if c.get(k)})
 
 
 @app.delete("/api/jobs/{job_id}/cast/{cast_id}")
@@ -388,6 +391,27 @@ def redo_character(cid: str, req: CharacterText) -> dict:
     if get_character(cid)["status"] not in ("ready", "failed"):
         raise HTTPException(409, "that character is still being made")
     return characters.redo(cid, req.name.strip(), req.appearance.strip(), req.look)
+
+
+class CharacterLora(BaseModel):
+    lora: str = Field(max_length=200)
+    trigger: str = Field(max_length=60)
+
+
+@app.get("/api/loras")
+def list_loras() -> list[str]:
+    """LTX LoRAs installed in ComfyUI."""
+    return [n for n in comfy.loras() if n.lower().startswith("ltx")]
+
+
+@app.put("/api/characters/{cid}/lora")
+def character_lora(cid: str, req: CharacterLora) -> dict:
+    get_character(cid)
+    if req.lora and req.lora not in comfy.loras():
+        raise HTTPException(400, "that LoRA is not installed in ComfyUI")
+    if req.lora and not req.trigger.strip():
+        raise HTTPException(400, "a LoRA needs the trigger word it was trained with")
+    return characters.set_lora(cid, req.lora, req.trigger.strip())
 
 
 @app.post("/api/jobs/{job_id}/characters/{char_id}/save")
