@@ -272,7 +272,8 @@ function Job({ id, onChange, onDeleted }) {
       )}
 
       {board && <Storyboard board={board} frames={frames} busy={busy} paused={job?.status === "paused"} jobId={id} onJob={(j) => { setJob(j); onChange(); }} onBoard={setBoard}
-        img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`} />}
+        img={(name) => `/api/jobs/${id}/images/keyframes/${name}?v=${job.updated}`}
+        clip={job?.stages.video === "done" && ((i) => `/api/jobs/${id}/clips/${i}?v=${job.updated}`)} />}
     </div>
   );
 }
@@ -419,7 +420,7 @@ function Cast({ job, disabled, onChange }) {
   );
 }
 
-function Storyboard({ board, frames, img, busy, paused, jobId, onJob, onBoard }) {
+function Storyboard({ board, frames, img, clip, busy, paused, jobId, onJob, onBoard }) {
   const names = Object.fromEntries(board.characters.map((c) => [c.id, c.name]));
   const saved = (scene) => onBoard({ ...board, scenes: board.scenes.map((s) => (s.index === scene.index ? scene : s)) });
   return (
@@ -442,6 +443,7 @@ function Storyboard({ board, frames, img, busy, paused, jobId, onJob, onBoard })
       <div className="scenes">
         {board.scenes.map((s) => (
           <Scene key={s.index} s={s} names={names} image={frames?.scenes[s.index] && img(frames.scenes[s.index])} qc={frames?.qc[s.index]}
+            clip={clip && clip(s.index)}
             busy={busy} paused={paused} jobId={jobId} onJob={onJob} onSaved={saved} />
         ))}
       </div>
@@ -460,7 +462,7 @@ function checkNote(takes) {
   return `Image check: still flagged (${last.map(words).join(", ")})${redrawn ? `, ${redrawn}` : ""}. Consider Redo or editing the text.`;
 }
 
-function Scene({ s, names, image, qc, busy, paused, jobId, onJob, onSaved }) {
+function Scene({ s, names, image, clip, qc, busy, paused, jobId, onJob, onSaved }) {
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const pick = (scene) => Object.fromEntries(SCENE_FIELDS.map((k) => [k, scene[k]]));
@@ -489,7 +491,7 @@ function Scene({ s, names, image, qc, busy, paused, jobId, onJob, onSaved }) {
 
   return (
     <article>
-      {image && <img src={image} alt={`Scene ${s.index + 1}`} />}
+      {image && (clip ? <video src={clip} poster={image} controls preload="none" /> : <img src={image} alt={`Scene ${s.index + 1}`} />)}
       {image && qc && <p className={qc[qc.length - 1].length ? "error" : "muted"}>{checkNote(qc)}</p>}
       <header>{s.index + 1} · {s.start.toFixed(1)}–{s.end.toFixed(1)}s · {s.emotion} · {s.transition}</header>
       {edit ? (

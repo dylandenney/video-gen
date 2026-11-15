@@ -251,6 +251,15 @@ def image(job_id: str, folder: str, name: str):
     return FileResponse(path)
 
 
+@app.get("/api/jobs/{job_id}/clips/{index}")
+def scene_clip(job_id: str, index: int):
+    get_job(job_id)
+    path = jobs.job_dir(job_id) / "clips" / f"{index:02d}.mp4"
+    if not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path)
+
+
 def to_png(data: bytes, folder: Path, name: str) -> Path:
     """Save an uploaded photo as PNG, at most 1536 px on the long side."""
     folder.mkdir(parents=True, exist_ok=True)
