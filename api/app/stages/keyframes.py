@@ -122,7 +122,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
                                    "or is their mouth covered or turned away from the camera?")
     if "microphone" not in shot.lower() and " mic" not in shot.lower():
         # Without this the image model adds microphone stands to anyone singing.
-        shot += " The open space in front of everyone's face is clear, with no microphones, stands or equipment."
+        shot += " Everyone sings unamplified into the open air, faces and mouths fully unobstructed, only the landscape around them."
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
