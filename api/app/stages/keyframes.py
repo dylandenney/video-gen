@@ -147,13 +147,18 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         else:
             graph = comfy.fill("qwen_image_t2i", width=w, height=h, seed=seed, negative=NEGATIVE,
                                prompt=f'{shot}. {style}. Cinematic film still, {COMPOSITION[aspect]}.')
-        comfy.run(graph, path)
-        problems = check(path, extra, len(refs) if refs else None)
+        take = path.with_name(f"{path.stem}_take{attempt}.png")
+        comfy.run(graph, take)
+        problems = check(take, extra, len(refs) if refs else None)
         takes.append(problems)
         if not problems:
             break
         log.info("scene %d attempt %d rejected: %s", s["index"], attempt + 1, "; ".join(problems))
-    # Out of attempts: keep the last take; the scene editor can redo it.
+    # Keep the take with the fewest problems (the first clean one if any); the scene editor can redo it.
+    best = min(range(len(takes)), key=lambda n: len(takes[n]))
+    for n in range(len(takes)):
+        take = path.with_name(f"{path.stem}_take{n}.png")
+        take.replace(path) if n == best else take.unlink()
     # qc.json keeps what each take was rejected for, for the scene cards.
     qc_path = d / "qc.json"
     qc = read_json(qc_path) if qc_path.is_file() else {}
