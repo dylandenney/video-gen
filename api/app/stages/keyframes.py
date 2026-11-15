@@ -120,7 +120,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         shot = f"Head-and-shoulders close-up of the singer standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
-    if "microphone" not in shot.lower() and " mic" not in shot.lower():
+    if "sing" in shot.lower() and "microphone" not in shot.lower() and " mic" not in shot.lower():
         # Without this the image model adds microphone stands to anyone singing.
         shot += " Everyone sings unamplified into the open air, faces and mouths fully unobstructed, only the landscape around them."
     if refs:
