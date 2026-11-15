@@ -105,9 +105,10 @@ SCHEMA = {
 SYSTEM = """You are a music-video director writing a storyboard for a short music video in the frame shape given.
 Rules:
 - Find the story and emotional arc in the lyrics and music. Support the feeling; don't illustrate every word literally.
+- The user's story idea is binding: use exactly the people, place, instruments and activity it names in every scene, and add nothing it doesn't imply. Take only mood and emotion from the lyrics, never props or plot (no phones, letters, cars or flashbacks the user didn't ask for). Microphones appear only when the user asks for them. When people play instruments (guitars), show them strumming steadily with the instrument held naturally.
 - If the user gives a story idea, build the storyboard around it: its characters, places and events come first, fitted to the music and slots. Keep the lyrics as emotional guidance.
 - Define each recurring character ONCE with a fixed, specific appearance (age, face, hair, build, clothing, colors). Reuse the exact same people across scenes.
-- Cast like a real casting director: give every invented character a distinctive, memorable look (exact age, skin tone and heritage, face shape, nose, brows, hair color and cut, one distinguishing feature). Avoid the stock look of "messy dark brown hair, light stubble, denim shirt over a white tee"; follow the casting nudge given.
+- Cast like a music-video casting director: invented characters are attractive, camera-ready people who look like real artists and actors in that genre, at a natural age for the role (performers usually 20s-40s unless the story says otherwise). Give each a specific look (age, skin tone and heritage, hair color and cut, build, outfit) and vary them between videos; follow the casting nudge given.
 - People who are a couple, duet partners, bandmates or family must look like they belong together: a believable age gap (within about 10 years for a couple), and clothes in the same style and genre as the story (country singers: boots, denim, western shirts or hats). The casting nudge applies to the lead; cast the others to match them.
 - Write exactly one scene per time slot given, with matching "index". Match the slot's energy: calm slots get slow camera moves, high-energy slots get bolder camera moves and faster cuts.
 - image_prompt: a single cinematic still composed for that frame shape. Describe subject, setting, lighting, lens, mood. Do NOT include character appearance text (age, face, hair, clothes) or the character's name; write "the woman", "the man", "the two singers", and list them by id in "characters". The image step adds each look itself, and a look written twice gets that person drawn twice.
@@ -115,10 +116,10 @@ Rules:
 - Write image_prompt as plain positive description; image models ignore or invert "no", "not" and "only". When a person handles something they also wear or use in pairs (shoes, gloves, earrings, a jacket going on), say where each one is: "her left foot in a sneaker, her right foot bare as she pulls the other sneaker on". Give each person clear, simple body positions, like which hand holds what and where the feet are.
 - Characters face the camera or are seen in profile, never from behind or over the shoulder: the image model copies their face from a front-facing reference and puts it on backwards.
 - angle: which way the main character's face points, as seen by the camera ("left" = toward the left side of the frame). Use "front" unless the prompt says angle photos exist.
-- Name each prop once with its count and place ("one vintage microphone on a stand in front of her"); never mention the same prop twice in a prompt, or it gets drawn twice.
+- Name each prop once with its count and place ("one acoustic guitar held across her body"); never mention the same prop twice in a prompt, or it gets drawn twice.
 - camera: one camera move (e.g. slow push-in, orbit left, static, handheld drift). motion: what moves in the shot.
 - description and motion must continue exactly from the image_prompt: same objects in the same hands and places, and motion says precisely what happens next ("she slides the sneaker onto her bare right foot"), never a different action.
-- Avoid fiddly hand-and-object actions as the main motion (putting on shoes or clothes, tying laces, buttoning, pouring, fingers on instruments); AI video gets them wrong. Show the moment just before or after instead (laces already tied, she stands up), or a tight close-up of the hands and the one object.
+- Avoid fiddly hand-and-object actions as the main motion (putting on shoes or clothes, tying laces, buttoning, pouring); AI video gets them wrong. Show the moment just before or after instead (laces already tied, she stands up), or a tight close-up of the hands and the one object.
 - Make movement believable: AI video garbles bodies in fast, chaotic action. Walking and dancing are welcome; keep them smooth and steady (a slow walk, a sway, a simple groove), with one or two people as the focus rather than crowds, and avoid flips, fights and fast spins.
 - Slots marked SING are lip-synced: exactly one character (the lead singer) sings to camera in a head-and-shoulders close-up, face toward the camera, steady even light on the face, mouth fully visible with no hands, props, smoke or flames in front of it. Other slots must not show anyone singing.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
@@ -134,11 +135,11 @@ def describe_photo(path: Path) -> str:
         "and clothing. Visual facts only; do not guess who they are.")}], temperature=0.2)
 
 
-AGES = ["early 20s", "late 20s", "mid 30s", "early 40s", "late 40s", "50s", "60s"]
-HAIR = ["red hair", "jet black hair", "platinum blond hair", "salt-and-pepper hair", "sandy blond hair", "auburn hair", "silver hair", "chestnut hair", "a shaved head", "black curls"]
-BUILDS = ["lanky", "stocky", "athletic", "heavyset", "wiry", "tall and broad", "short and slight"]
-FEATURES = ["a crooked nose", "a gap-toothed smile", "thick eyebrows", "a beard", "a scar through one eyebrow", "glasses",
-            "deep-set eyes", "a round open face", "high cheekbones", "a clean-shaven square jaw", "freckles", "laugh lines"]
+AGES = ["early 20s", "mid 20s", "late 20s", "early 30s", "mid 30s", "late 30s", "early 40s"]
+HAIR = ["red hair", "jet black hair", "platinum blond hair", "sandy blond hair", "auburn hair", "silver hair", "chestnut hair", "a shaved head", "black curls"]
+BUILDS = ["slim", "athletic", "tall", "average build", "curvy", "broad-shouldered", "petite"]
+FEATURES = ["freckles", "a warm wide smile", "a neat short beard", "high cheekbones", "dimples", "a clean-shaven jaw",
+            "strong eyebrows", "laugh lines", "a light tan", "bright eyes"]
 
 
 def casting_nudge(job_id: str) -> str:
@@ -189,6 +190,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         *cast_lines,
         f"Casting nudge for invented characters (vary from other videos): {casting_nudge(job['id'])}.",
         "",
+        *([f'Reminder, the user asked for: {p["story"].strip()} Every scene must show exactly this.', ""] if p.get("story", "").strip() else []),
         "Time slots (energy 0-1):",
         *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' + (' SING' if s['sing'] else '') for s in slots],
     ])
