@@ -96,7 +96,9 @@ def sheet_graph(name: str, appearance: str, seed: int, look: str = "realistic") 
 
 
 # The storyboard often repeats a look in image_prompt that `who` also gives; without a count the edit model drew that person twice.
-COUNT = {1: "Exactly one person is in the frame.", 2: "Exactly two people are in the frame.", 3: "Exactly three people are in the frame."}
+# "character", not "person": with a non-human lead, "person" made the model add a human.
+NON_HUMAN = re.compile(r"\b(alien|creature|robot|animal|monster|cartoon|animated)\b", re.I)
+COUNT = {1: "Exactly one character is in the frame.", 2: "Exactly two characters are in the frame.", 3: "Exactly three characters are in the frame."}
 
 ANGLE_SHOT = {
     "left_three_quarter": "three-quarter view, their face turned toward the left side of the frame",
@@ -117,7 +119,12 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     shot = s["image_prompt"]
     if s.get("singing"):
         # Lip sync runs at 480 px wide; a waist-up singer's mouth was too small to follow the words.
-        shot = f"Head-and-shoulders close-up of the singer standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
+        # Name the character: "the singer" (made "the musician" below) drew an extra human beside non-human leads.
+        lead = next((c["name"] for c in board["characters"] if refs and c["id"] == refs[0]), "the singer")
+        # A storyboard "medium shot" next to this close-up made the model draw the character twice, once at each size.
+        shot = re.sub(r"\b(extreme |very )?(wide|medium|long|full[- ]body|establishing|low-angle|high-angle) (shot|view)\b", "close-up", shot, flags=re.I)
+        shot = re.sub(r"[^.]*\b(lower|higher|small) in the frame\b[^.]*\.", "", shot, flags=re.I)
+        shot = f"Head-and-shoulders close-up of {lead} standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
     mics = board.get("mics", "").lower()
@@ -126,15 +133,17 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # The image model adds a microphone stand to anyone called a singer, even when told otherwise,
         # so call them musicians and redraw any take that still has one.
         shot = re.sub(r"\bsingers\b", "musicians", re.sub(r"\bsinger\b", "musician", shot))
-        shot += " Everyone sings unamplified into the open air, faces and mouths fully unobstructed, only the landscape around them."
+        names = " and ".join(c["name"] for c in board["characters"] if c["id"] in refs) or "Everyone"
+        shot += f" {names} sing unamplified into the open air, mouths fully unobstructed, nobody else in the frame."
         extra["unwanted_microphone"] = "is there a microphone or microphone stand anywhere in the image?"
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
-        who = "; ".join(f"{chars[cid]['name']} is the person in image {n + 1}, looking and dressed exactly as described: {chars[cid]['appearance']}"
+        who = "; ".join(f"{chars[cid]['name']} is the character in image {n + 1}, looking and dressed exactly as described: {chars[cid]['appearance']}"
                         for n, cid in enumerate(refs))
         # Close-ups sometimes came back with an oversized, doll-like head; the checker could not spot it.
-        shot += " Natural adult proportions, head in normal scale to the shoulders and body."
+        if not any(NON_HUMAN.search(chars[cid]["appearance"]) for cid in refs):
+            shot += " Natural adult proportions, head in normal scale to the shoulders and body."
         # Bald characters (aliens, robots, shaved heads) came back with wispy hair in close-ups.
         bald = [chars[cid]["name"] for cid in refs if re.search(r"\b(bald|hairless|no (visible )?hair)\b", chars[cid]["appearance"], re.I)]
         if bald:
@@ -169,7 +178,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
             graph = comfy.fill("qwen_image_edit", width=w, height=h, seed=seed,
                                image1=images[0], image2=images[1], image3=images[2], prompt=(
                 f'Create a new cinematic film still, {COMPOSITION[aspect]}: {shot} {who}. {COUNT[len(refs)]} '
-                f"Keep each person's face, hair and body exactly as in their reference image; "
+                f"Keep each character's face, hair and body exactly as in their reference image; "
                 f"do not copy the background of the reference images. {style}."))
         else:
             graph = comfy.fill("qwen_image_t2i", width=w, height=h, seed=seed, negative=NEGATIVE,
