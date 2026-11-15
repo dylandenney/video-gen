@@ -8,11 +8,17 @@ Writes storyboard.json.
 """
 import json
 import random
+import re
 from pathlib import Path
+
+import librosa
+import numpy as np
+import soundfile as sf
 
 from ..adapters import ollama
 from ..config import OLLAMA_MODEL, VISION_MODEL
 from ..jobs_io import read_json, write_json
+from .video import isolate_vocals
 
 MIN_SHOT, TARGET_SHOT, MAX_SHOT = 2.5, 4.0, 5.0
 SHAPES = {"9:16": "vertical 9:16, for phones", "16:9": "horizontal 16:9 widescreen"}
@@ -121,7 +127,7 @@ Rules:
 - description and motion must continue exactly from the image_prompt: same objects in the same hands and places, and motion says precisely what happens next ("she slides the sneaker onto her bare right foot"), never a different action.
 - Avoid fiddly hand-and-object actions as the main motion (putting on shoes or clothes, tying laces, buttoning, pouring); AI video gets them wrong. Show the moment just before or after instead (laces already tied, she stands up), or a tight close-up of the hands and the one object.
 - Make movement believable: AI video garbles bodies in fast, chaotic action. Walking and dancing are welcome; keep them smooth and steady (a slow walk, a sway, a simple groove), with one or two people as the focus rather than crowds, and avoid flips, fights and fast spins.
-- Slots marked SING are lip-synced: exactly one character (the lead singer) sings to camera in a head-and-shoulders close-up, face toward the camera, steady even light on the face, mouth fully visible with no hands, props, smoke or flames in front of it. Other slots must not show anyone singing.
+- Slots marked SING are lip-synced: exactly one character sings to camera (for "SING (female voice)" a woman, for "SING (male voice)" a man; in a duet each partner sings their own lines) in a head-and-shoulders close-up, face toward the camera, steady even light on the face, mouth fully visible with no hands, props, smoke or flames in front of it. Other slots must not show anyone singing.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
 - One consistent visual_style and palette (3-5 hex colors) for the whole video.
 Reply with JSON only."""
@@ -158,6 +164,24 @@ BRIEF = {
 def brief_lines(p: dict) -> list[str]:
     answers = [f"- {label}: {v}" for k, label in BRIEF.items() if (v := p.get("brief", {}).get(k, "").strip())]
     return ["Video brief from the user (binding; every scene follows every answer):", *answers, ""] if answers else []
+
+
+def voice_of(vocals: np.ndarray, sr: int, s: dict) -> str:
+    """'male' or 'female' from the median pitch of the singing in a slot; '' when too little is voiced."""
+    seg = vocals[int(s["start"] * sr):int(s["end"] * sr)]
+    seg = librosa.resample(seg.mean(axis=1) if seg.ndim > 1 else seg, orig_sr=sr, target_sr=16000)
+    f0, voiced, _ = librosa.pyin(seg, fmin=70, fmax=800, sr=16000)
+    f0 = f0[voiced]
+    if len(f0) < 20:
+        return ""
+    return "female" if np.median(f0) > 165 else "male"  # between typical sung male (~100-160 Hz) and female (~180+ Hz) ranges
+
+
+def gender_of(appearance: str) -> str:
+    a = appearance.lower()
+    if re.search(r"\b(woman|female|girl|lady)\b", a):
+        return "female"
+    return "male" if re.search(r"\b(man|male|guy|boy)\b", a) else ""
 
 
 def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cast: list[dict]) -> str:
@@ -205,7 +229,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         "",
         *([f'Reminder, the user asked for: {p["story"].strip()} Every scene must show exactly this.', ""] if p.get("story", "").strip() else []),
         "Time slots (energy 0-1):",
-        *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' + (' SING' if s['sing'] else '') for s in slots],
+        *[f'{s["index"]}: {s["start"]:.1f}-{s["end"]:.1f}s energy {s["energy"]:.2f}' + (f' SING ({s["voice"]} voice)' if s.get("voice") else ' SING' if s['sing'] else '') for s in slots],
     ])
 
 
@@ -247,6 +271,12 @@ def run(d: Path, job: dict) -> None:
     analysis = read_json(d / "analysis.json")
     lyrics = read_json(d / "lyrics.json")
     slots = mark_singing(plan_slots(analysis, lyrics), lyrics, job["params"].get("performance", False))
+    if any(s["sing"] for s in slots):
+        # Duets: the singer on screen must match the voice heard.
+        vocals, sr = sf.read(isolate_vocals(d))
+        for s in slots:
+            if s["sing"]:
+                s["voice"] = voice_of(vocals, sr, s)
     # Every cast member is described from their picture, so the text matches the face the edit model copies;
     # a short library note like "sassy blonde country singer" let the LLM invent a different haircut and outfit.
     cast = [{**c, "description": describe_photo(d / "cast" / c["photo"]) + (f' ({c["appearance"]})' if c.get("appearance") else "")}
@@ -263,9 +293,10 @@ def run(d: Path, job: dict) -> None:
 
     known = set(by_id)
     board["scenes"] = [
-        {**by_index[s["index"]], **{k: v for k, v in s.items() if k != "sing"},
+        {**by_index[s["index"]], **{k: v for k, v in s.items() if k not in ("sing", "voice")},
          "characters": (chars := [c for c in by_index[s["index"]]["characters"] if c in known]),
-         "singing": s["sing"] and len(chars) == 1,  # lip sync follows one face
+         "singing": s["sing"] and len(chars) == 1  # lip sync follows one face
+                    and (not s.get("voice") or gender_of(by_id[chars[0]]["appearance"]) in ("", s["voice"])),
          "seed": int(job["id"][:8], 16) + s["index"]}  # scene edits bump this to get a new take
         for s in slots
     ]
