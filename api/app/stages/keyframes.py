@@ -135,6 +135,11 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
                         for n, cid in enumerate(refs))
         # Close-ups sometimes came back with an oversized, doll-like head; the checker could not spot it.
         shot += " Natural adult proportions, head in normal scale to the shoulders and body."
+        # Bald characters (aliens, robots, shaved heads) came back with wispy hair in close-ups.
+        bald = [chars[cid]["name"] for cid in refs if re.search(r"\b(bald|hairless|no (visible )?hair)\b", chars[cid]["appearance"], re.I)]
+        if bald:
+            shot += f" {' and '.join(bald)} {'is' if len(bald) == 1 else 'are'} completely bald, with no hair at all."
+            extra["unwanted_hair"] = f"{' and '.join(bald)} should be completely bald. Does any of them have hair on the head?"
         # Action words like "spinning" made the model add a twirling skirt over jeans.
         extra["wrong_clothes"] = ("these clothes are wanted: " + " ".join(chars[cid]["appearance"] for cid in refs)
                                   + " Is anyone wearing a garment that is not described there, such as a skirt or dress added over trousers?")
