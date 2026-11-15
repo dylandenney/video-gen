@@ -122,6 +122,8 @@ class GenerateRequest(BaseModel):
     lyrics: str = ""
     style: str = ""
     story: str = Field("", max_length=4000)
+    # Answers from the optional questionnaire ("performers", "mics", "setting", ...); blank answers are left out.
+    brief: dict[str, str] = Field(default_factory=dict, max_length=20)
     performance: bool = False  # lip-sync every sung scene instead of up to a third
     review: bool = False  # pause after the images so they can be checked before the video stage
     motion: Literal["stills", "draft", "final", "ltx"] = "ltx"

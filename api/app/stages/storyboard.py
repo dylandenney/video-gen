@@ -148,6 +148,18 @@ def casting_nudge(job_id: str) -> str:
     return f"lead aged {r.choice(AGES)}, {r.choice(HAIR)}, {r.choice(BUILDS)}, {r.choice(FEATURES)}; any heritage that suits the story"
 
 
+BRIEF = {
+    "performers": "Performers", "genders": "Gender", "ages": "Age range", "look": "Look and style",
+    "instruments": "Instruments", "mics": "Microphones", "setting": "Setting", "time": "Time of day",
+    "weather": "Weather", "type": "Video type", "mood": "Mood", "energy": "Camera energy",
+}
+
+
+def brief_lines(p: dict) -> list[str]:
+    answers = [f"- {label}: {v}" for k, label in BRIEF.items() if (v := p.get("brief", {}).get(k, "").strip())]
+    return ["Video brief from the user (binding; every scene follows every answer):", *answers, ""] if answers else []
+
+
 def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cast: list[dict]) -> str:
     p = job["params"]
     cast_lines = []
@@ -179,6 +191,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         *([f'Story idea from the user (follow it; it overrides your own reading of the lyrics): {p["story"]}'] if p.get("story", "").strip() else []),
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
         *([PERFORMANCE] if p.get('performance') else []),
+        *brief_lines(p),
         f'Frame: {SHAPES[p.get("aspect", "9:16")]}.',
         "",
         "Full song lyrics (the story and genre come from these; a first line may list the genre):" if full
@@ -257,5 +270,6 @@ def run(d: Path, job: dict) -> None:
         for s in slots
     ]
     board["model"] = OLLAMA_MODEL
+    board["mics"] = job["params"].get("brief", {}).get("mics", "")  # "yes"/"no" from the questionnaire, read by keyframes
     board["aspect"] = job["params"].get("aspect", "9:16")  # later stages size everything from this
     write_json(d / "storyboard.json", board)

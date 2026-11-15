@@ -207,6 +207,7 @@ function Job({ id, onChange, onDeleted }) {
           <span className="muted"> Heard by AI, so check the words before exporting with lyrics on screen.</span>
         </p>
         <textarea rows={3} placeholder="Story idea (optional). Leave empty to let the AI find a story in the lyrics. e.g. Two old friends drive to the coast; one is moving away. Ends at sunset on the beach." value={form.story || ""} onChange={(e) => setForm({ ...form, story: e.target.value })} />
+        <Brief brief={form.brief || {}} onChange={(brief) => setForm({ ...form, brief })} />
         <input type="text" placeholder="Style notes, e.g. nostalgic, golden hour, small-town Georgia" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} />
         <div className="row">
           <span className="muted">Presets:</span>
@@ -299,6 +300,58 @@ function Export({ jobId, version }) {
       <a className="button" href={`/api/jobs/${jobId}/export/${preset}?text=${text}&v=${version}`} download>Download</a>
       <p className="muted">Takes about 20 seconds the first time. Captions sit above each app's buttons; audio is leveled to -14 LUFS.</p>
     </div>
+  );
+}
+
+// Optional questionnaire; "" means no preference. Choices are sent as plain words the storyboard reads.
+const BRIEF_CHOICES = [
+  ["Performers", [
+    ["performers", "How many", ["1", "2 (duet)", "3", "a band", "no performers, story only"]],
+    ["genders", "Who", ["female", "male", "one female and one male", "mixed group"]],
+    ["ages", "Age", ["20s", "30s", "40s", "50s and up"]],
+    ["look", "Look", "e.g. country: boots, denim, western hats"],
+  ]],
+  ["Instruments & mics", [
+    ["instruments", "Instruments", ["acoustic guitars", "electric guitars", "piano", "full band", "none, just singing"]],
+    ["mics", "Microphones", ["yes, show microphones", "no microphones"]],
+  ]],
+  ["Setting & time", [
+    ["setting", "Where", "e.g. a wheat field, a small stage, a city rooftop"],
+    ["time", "Time of day", ["sunrise", "daytime", "golden hour", "night"]],
+    ["weather", "Weather", ["clear", "cloudy", "rain", "snow"]],
+  ]],
+  ["Video type & mood", [
+    ["type", "Type", ["performance only", "story only", "mix of performance and story"]],
+    ["mood", "Mood", "e.g. nostalgic, joyful, heartbroken"],
+    ["energy", "Camera", ["calm and slow", "medium", "high energy, fast cuts"]],
+  ]],
+];
+
+function Brief({ brief, onChange }) {
+  const set = (k, v) => onChange({ ...brief, [k]: v });
+  const filled = Object.values(brief).filter((v) => v).length;
+  return (
+    <details className="brief">
+      <summary>Describe your video (optional{filled ? `, ${filled} answered` : ""})</summary>
+      <p className="muted">Skip anything you don't mind. Answers are followed in every scene.</p>
+      {BRIEF_CHOICES.map(([group, fields]) => (
+        <fieldset key={group}>
+          <legend>{group}</legend>
+          {fields.map(([k, label, choices]) => (
+            <label key={k}>{label}{" "}
+              {Array.isArray(choices) ? (
+                <select value={brief[k] || ""} onChange={(e) => set(k, e.target.value)}>
+                  <option value="">no preference</option>
+                  {choices.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              ) : (
+                <input type="text" placeholder={choices} value={brief[k] || ""} onChange={(e) => set(k, e.target.value)} style={{ marginBottom: 0 }} />
+              )}
+            </label>
+          ))}
+        </fieldset>
+      ))}
+    </details>
   );
 }
 
