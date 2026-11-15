@@ -144,6 +144,9 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # Close-ups sometimes came back with an oversized, doll-like head; the checker could not spot it.
         if not any(NON_HUMAN.search(chars[cid]["appearance"]) for cid in refs):
             shot += " Natural adult proportions, head in normal scale to the shoulders and body."
+        else:
+            # Edit takes sometimes put a human face (pink skin, baby features) on a creature's body.
+            extra["human_face"] = "is this meant to be a creature, but does it have a human-looking face or pink human skin?"
         # Bald characters (aliens, robots, shaved heads) came back with wispy hair in close-ups.
         bald = [chars[cid]["name"] for cid in refs if re.search(r"\b(bald|hairless|no (visible )?hair)\b", chars[cid]["appearance"], re.I)]
         if bald:
