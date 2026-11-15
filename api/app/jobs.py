@@ -242,6 +242,8 @@ def estimate(job: dict, params: dict | None = None) -> dict | None:
     p = params or job["params"]
     run = job.get("run") or {"steps": list(STAGES), "scene": None}
     steps = list(STAGES) if params else run["steps"]
+    if not params and run.get("pause") and "keyframes" in steps:  # the run stops after the images for review
+        steps = steps[:steps.index("keyframes") + 1]
     has_board = not params and (d / "storyboard.json").is_file()
     scenes = read_json(d / "storyboard.json")["scenes"] if has_board else []
     if run["scene"] is not None and not params:
