@@ -76,6 +76,16 @@ PRESETS = {  # video styles: lip-synced share, what to show, and brief answers i
         "sitting very low, one glossy metallic candy-apple colour, gold wire wheels. "
         "Bright California sun, warm over-saturated colours, light film grain.",
         {"genders": "the lead rapper is a man", "look": "1990s West Coast rap"}),
+    "90s-country": (0.5, "Video style: traditional 1990s country music video. The lead singer (matching the voice heard) is one named "
+        "character in 90s country clothes (cowboy hat, pearl-snap or denim shirt, Wranglers, boots), the same look in every shot. "
+        "Performance (SING slots): the singer sings to the camera with an acoustic guitar, on a farmhouse porch, by a barn, "
+        "or on a small-town dance-hall stage; list only the singer in a SING slot's characters (lip sync follows one face) "
+        "and describe any band or crowd as blurred figures behind. Cutaways (all other slots, each different) tell a simple "
+        "small-town story from the lyrics: an old pickup truck on a dirt road, couples line dancing or two-stepping in a dance hall, "
+        "a tailgate at sunset, a Friday-night football field under lights, a river or fishing pond, wheat or hay fields, "
+        "a small-town main street, a front-porch swing. Slow dolly and crane moves, golden-hour light, soft warm "
+        "film look with light grain.",
+        {"look": "1990s country music video"}),
 }
 
 
