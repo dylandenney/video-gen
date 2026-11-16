@@ -167,8 +167,9 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
             extra["unwanted_hair"] = f"{' and '.join(bald)} should be completely bald. Does any of them have hair on the head?"
         # Action words like "spinning" made the model add a twirling skirt over jeans.
         extra["wrong_clothes"] = ("these clothes are wanted: " + " ".join(chars[cid]["appearance"] for cid in refs)
-                                  + " Is anyone wearing a garment that is not described there, such as a skirt or dress added over trousers? "
-                                  "Clothes that are out of frame or hidden do not count; answer only about garments you can see.")
+                                  + " Is anyone wearing a garment that clearly contradicts that description, such as a skirt or dress added over trousers, "
+                                  "or a different type or colour of top? Small extras like belts, straps, jewellery or a hat do not count, "
+                                  "and neither do clothes that are out of frame or hidden; answer only about garments you can see.")
         if len(refs) > 1:
             people = " ".join(f"{chars[cid]['name']}: {chars[cid]['appearance']}" for cid in refs)
             extra["swapped_outfits"] = f"these people should appear: {people} Is anyone wearing clothes described for a different person?"
