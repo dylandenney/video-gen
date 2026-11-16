@@ -126,7 +126,10 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         shot = re.sub(r"[^.]*\b(lower|higher|small) in the frame\b[^.]*\.", "", shot, flags=re.I)
         # "close-up looking up at the alien" drew a second, human onlooker doing the looking.
         shot = re.sub(r"\b(looking|gazing|peering) (up|down) at\b", "of", shot, flags=re.I)
-        shot = f"Head-and-shoulders close-up of {lead} standing or sitting upright, the face filling the upper half of the frame, mouth clearly visible, facing the camera. {shot}"
+        # Legwear in a close-up ("dark denim jeans") made the model add a full-body panel under the face.
+        shot = re.sub(r",[^,.]*\b(jeans|trousers|pants|boots|shoes|skirt)\b[^,.]*", "", shot, flags=re.I)
+        shot = (f"One single photo, no panels or insets: a head-and-shoulders close-up of {lead}, framed from the chest up, "
+                f"the face large in the frame, mouth clearly visible, facing the camera. {shot}")
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
     mics = board.get("mics", "").lower()
