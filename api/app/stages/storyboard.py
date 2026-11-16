@@ -177,6 +177,7 @@ Rules:
 - Make movement believable: AI video garbles bodies in fast, chaotic action. Walking and dancing are welcome; keep them smooth and steady (a slow walk, a sway, a simple groove), with one or two people as the focus rather than crowds, and avoid flips, fights and fast spins.
 - Slots marked SING are lip-synced: exactly one character sings to camera (for "SING (female voice)" a woman, for "SING (male voice)" a man; in a duet each partner sings their own lines) in a head-and-shoulders close-up, face toward the camera, steady even light on the face, mouth fully visible with no hands, props, smoke or flames in front of it. Other slots must not show anyone singing.
 - A moving vehicle always has its driver visible at the wheel.
+- A scene showing any part of a person (hands on a guitar, arms, a silhouette) lists that character in characters, so their look carries over; a scene with an empty characters list shows no people at all.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
 - One consistent visual_style and palette (3-5 hex colors) for the whole video.
 Reply with JSON only."""

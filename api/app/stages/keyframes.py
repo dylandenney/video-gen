@@ -47,6 +47,7 @@ QC_QUESTIONS = {
     "unnatural_pose": "is anyone standing or sitting in a physically impossible or twisted pose?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
     "big_head": "is anyone's head unnaturally large for their body?",
+    "sideways": "is the image rotated sideways or upside down?",
     "collage": "is the image split into two or more separate pictures or panels?",
 }
 
