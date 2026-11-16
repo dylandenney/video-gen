@@ -76,6 +76,9 @@ def render_clip(d: Path, board: dict, s: dict, mode: str) -> None:
     workflow, w, h, fps = MODES[mode]
     image = comfy.upload(d / "keyframes" / f'{s["index"]:02d}.png')
     prompt = f'{s["description"]} {s["motion"]}. Camera: {s["camera"]}. {board["visual_style"]}. Cinematic, natural motion.'
+    # People sometimes walked backwards in clips; the negative prompt alone didn't stop it.
+    if re.search(r"\b(walk|stroll|wander|run|jog|march|strut)", f'{s["description"]} {s["motion"]}', re.I):
+        prompt += " Anyone walking moves forward, facing the way they are going."
     # Extra 0.6 s covers the longest transition overlap into the next scene (see assemble.TRANSITIONS).
     seconds = s["end"] - s["start"] + 0.6
     audio = None
