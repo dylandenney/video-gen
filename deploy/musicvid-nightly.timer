@@ -1,8 +1,8 @@
 [Unit]
-Description=Run the Music Video Studio nightly test at 1 AM (US Eastern)
+Description=Run the Music Video Studio nightly test at 9:30 PM (US Eastern)
 
 [Timer]
-OnCalendar=*-*-* 01:00:00 America/New_York
+OnCalendar=*-*-* 21:30:00 America/New_York
 Persistent=false
 
 [Install]

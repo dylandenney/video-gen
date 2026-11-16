@@ -35,7 +35,7 @@
 - Downloaded to `~/ltx-trainer/models/` (from Lightricks/LTX-2.5, for training only): `ltx-2.5-22b-dev-transformer-bf16.safetensors` (42.0 GB), `gemma4-12b-with-proj-ltx-2.5-bf16.safetensors` (26.3 GB). VAEs reused from ComfyUI `models/vae/` (no duplicates).
 
 ## 2026-11-16 — Nightly regression timer
-- Installed systemd user units `~/.config/systemd/user/musicvid-nightly.{service,timer}` (copies of `deploy/`), enabled; runs `tools/nightly_test.py` at 01:00 America/New_York. Remove with `systemctl --user disable --now musicvid-nightly.timer`.
+- Installed systemd user units `~/.config/systemd/user/musicvid-nightly.{service,timer}` (copies of `deploy/`), enabled; runs `tools/nightly_test.py` at 21:30 America/New_York (was 01:00). Remove with `systemctl --user disable --now musicvid-nightly.timer`.
 - Stopped the `vllm-coder` container (2026-11-15) to free ~59 GB unified memory; restart with `docker start vllm-coder`.
 
 ## 2026-11-16 — Local coding agent (trial)
