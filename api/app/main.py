@@ -118,6 +118,10 @@ def delete_job(job_id: str) -> dict:
 MAX_SECONDS = 600  # whole songs are allowed; they run overnight
 
 
+class SceneCharacter(BaseModel):
+    name: str = Field("", max_length=80)
+
+
 class GenerateRequest(BaseModel):
     start: float = Field(ge=0)
     end: float = Field(gt=0)
@@ -425,6 +429,18 @@ def save_job_character(job_id: str, char_id: str) -> dict:
         return characters.from_job(jobs.job_dir(job_id), char_id)
     except (StopIteration, FileNotFoundError):
         raise HTTPException(404, "that character has no picture yet")
+
+
+@app.post("/api/jobs/{job_id}/scenes/{index}/save")
+def save_scene_character(job_id: str, index: int, req: SceneCharacter) -> dict:
+    """Start a library character from a scene's picture; the vision model describes the main person in it."""
+    get_job(job_id)
+    frame = jobs.job_dir(job_id) / "keyframes" / f"{index:02d}.png"
+    if not frame.exists():
+        raise HTTPException(404, "this scene has no picture yet")
+    png = characters.LIBRARY / f"scene_{uuid.uuid4().hex[:8]}.png"
+    shutil.copyfile(frame, png)
+    return characters.from_photo(req.name.strip() or "Character", png)
 
 
 @app.delete("/api/characters/{cid}")

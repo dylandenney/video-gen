@@ -502,6 +502,7 @@ function Scene({ s, names, image, clip, qc, busy, paused, jobId, onJob, onSaved 
       {image && (clip ? <video src={clip} poster={image} controls preload="none" /> : <img src={image} alt={`Scene ${s.index + 1}`} />)}
       {image && qc && <p className={qc[qc.length - 1].length ? "error" : "muted"}>{checkNote(qc)}</p>}
       <header>{s.index + 1} · {s.start.toFixed(1)}–{s.end.toFixed(1)}s · {s.emotion} · {s.transition}</header>
+      {image && <SaveSceneCharacter jobId={jobId} index={s.index} />}
       {edit ? (
         <>
           {field("description", 3)}
@@ -550,6 +551,16 @@ function Scene({ s, names, image, clip, qc, busy, paused, jobId, onJob, onSaved 
       {error && <p className="error">{error}</p>}
     </article>
   );
+}
+
+function SaveSceneCharacter({ jobId, index }) {
+  const [saved, setSaved] = useState(false);
+  if (saved) return <span className="muted">saved to library</span>;
+  const save = () => {
+    const name = window.prompt("Name for this character (the main person in this picture is saved):");
+    if (name !== null) api(`/jobs/${jobId}/scenes/${index}/save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) }).then(() => setSaved(true));
+  };
+  return <button className="link" onClick={save}>save character to library</button>;
 }
 
 function SaveCharacter({ jobId, charId }) {
