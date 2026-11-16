@@ -51,6 +51,7 @@ QC_QUESTIONS = {
 
 
 # Flags the checker raised on most normal-looking images in testing: shown as notes, never a reason to redraw.
+LEGWEAR = r",[^,.]*\b(jeans|trousers|pants|boots|shoes|skirt|shorts|overalls)\b[^,.]*"
 NOTE_ONLY = {"distorted_face", "extra_limbs", "twisted_body", "unnatural_pose", "human_face", "garbled_text"}
 
 
@@ -127,7 +128,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # "close-up looking up at the alien" drew a second, human onlooker doing the looking.
         shot = re.sub(r"\b(looking|gazing|peering) (up|down) at\b", "of", shot, flags=re.I)
         # Legwear in a close-up ("dark denim jeans") made the model add a full-body panel under the face.
-        shot = re.sub(r",[^,.]*\b(jeans|trousers|pants|boots|shoes|skirt)\b[^,.]*", "", shot, flags=re.I)
+        shot = re.sub(LEGWEAR, "", shot, flags=re.I)
         shot = (f"One single photo, no panels or insets: a head-and-shoulders close-up of {lead}, framed from the chest up, "
                 f"the face large in the frame, mouth clearly visible, facing the camera. {shot}")
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
@@ -144,8 +145,12 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
     if refs:
         chars = {c["id"]: c for c in board["characters"]}
         # Spell out everyone's look: with only a picture to go on, the edit model swapped outfits between people.
-        who = "; ".join(f"{chars[cid]['name']} is the character in image {n + 1}, looking and dressed exactly as described: {chars[cid]['appearance']}"
+        # In a chest-up close-up the described jeans got pulled up to the chest, so leave legwear out there too.
+        who = "; ".join(f"{chars[cid]['name']} is the character in image {n + 1}, looking and dressed exactly as described: "
+                        + (re.sub(LEGWEAR, "", chars[cid]['appearance'], flags=re.I) if s.get("singing") else chars[cid]['appearance'])
                         for n, cid in enumerate(refs))
+        # Library pictures have a plain studio wall, which came through as the whole background.
+        who += ". Take only the people from the reference images, not their plain backgrounds; set them in the place described"
         # Close-ups sometimes came back with an oversized, doll-like head; the checker could not spot it.
         if not any(NON_HUMAN.search(chars[cid]["appearance"]) for cid in refs):
             shot += " Natural adult proportions, head in normal scale to the shoulders and body."
