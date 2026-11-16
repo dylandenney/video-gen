@@ -232,6 +232,12 @@ function Job({ id, onChange, onDeleted }) {
             </select>
           </label>
           <label title="Every scene with singing becomes a lip-synced shot of the singer, from changing angles"><input type="checkbox" checked={!!form.performance} onChange={(e) => setForm({ ...form, performance: e.target.checked })} /> Performance (singer on camera)</label>
+          <label title="A ready-made look and mix of performance and cutaway shots">Video style{" "}
+            <select value={form.preset || ""} onChange={(e) => setForm({ ...form, preset: e.target.value })}>
+              <option value="">Default</option>
+              <option value="90s-west-coast-rap">90s West Coast rap</option>
+            </select>
+          </label>
           <label title="Stop after the images so you can check and redo them before the slow video stage"><input type="checkbox" checked={!!form.review} onChange={(e) => setForm({ ...form, review: e.target.checked })} /> Pause after images</label>
           <label>Frame{" "}
             <select value={form.aspect} onChange={(e) => setForm({ ...form, aspect: e.target.value })}>

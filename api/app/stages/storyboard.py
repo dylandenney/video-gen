@@ -64,8 +64,18 @@ PERFORMANCE = ("Performance video: the lead singer (the first cast member if any
                "or a quiet detail of the setting. No other people unless the story idea asks for them; a story idea colors the setting and mood.")
 
 
-def mark_singing(slots: list[dict], lyrics: dict, performance: bool = False, voice=None) -> list[dict]:
-    """Mark the slots with the most singing (up to a third of them, or all in performance mode) to be lip-synced.
+PRESETS = {  # video styles: what to show and how much of it is lip-synced performance
+    "90s-west-coast-rap": (0.4, "Video style: classic 1990s West Coast rap video. Mix two kinds of shots. Performance (SING slots): "
+        "the rapper raps to the camera beside a candy-painted lowrider, the crew standing behind him nodding to the beat, "
+        "low angles and fish-eye close-ups. Cutaways (all other slots, each different): lowriders bouncing on hydraulics, "
+        "a lowrider three-wheeling, a car-club line-up on a sunny boulevard, a backyard barbecue or block party, "
+        "adult women dancing in 90s fashion (crop tops, hoop earrings, bandanas), palm trees against a sunset, "
+        "chrome wire wheels close-up. Bright California sun, warm over-saturated colours, light film grain."),
+}
+
+
+def mark_singing(slots: list[dict], lyrics: dict, share: float = 1 / 3, voice=None) -> list[dict]:
+    """Mark the slots with the most singing (up to `share` of them; 1 in performance mode) to be lip-synced.
 
     Decided here rather than by the LLM, which flagged too few or none. `voice(slot)` names the voice heard;
     in a duet each voice gets at least one lip-synced slot, so the second singer is not left miming.
@@ -76,7 +86,7 @@ def mark_singing(slots: list[dict], lyrics: dict, performance: bool = False, voi
     if ranked and voice:
         for s in ranked:
             s["voice"] = voice(s)
-    best = ranked[:len(slots) if performance else max(1, len(slots) // 3)]
+    best = ranked[:max(1, round(len(slots) * share))]
     for v in {s.get("voice") for s in ranked} - {s.get("voice") for s in best} - {None, ""}:
         best.append(next(s for s in ranked if s.get("voice") == v))
     return [{**{k: v for k, v in s.items() if k != "sung"}, "sing": s in best} for s in slots]
@@ -223,6 +233,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         *([f'Story idea from the user (follow it; it overrides your own reading of the lyrics): {p["story"]}'] if p.get("story", "").strip() else []),
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
         *([PERFORMANCE] if p.get('performance') else []),
+        *([PRESETS[p["preset"]][1]] if p.get("preset") in PRESETS else []),
         *brief_lines(p),
         f'Frame: {SHAPES[p.get("aspect", "9:16")]}.',
         "",
@@ -284,7 +295,9 @@ def run(d: Path, job: dict) -> None:
         vocals or vocals.extend(sf.read(isolate_vocals(d)))
         return voice_of(*vocals, s)
 
-    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, job["params"].get("performance", False), voice)
+    p = job["params"]
+    share = 1 if p.get("performance") else PRESETS[p["preset"]][0] if p.get("preset") in PRESETS else 1 / 3
+    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, share, voice)
     # Every cast member is described from their picture, so the text matches the face the edit model copies;
     # a short library note like "sassy blonde country singer" let the LLM invent a different haircut and outfit.
     cast = [{**c, "description": describe_photo(d / "cast" / c["photo"]) + (f' ({c["appearance"]})' if c.get("appearance") else "")}
