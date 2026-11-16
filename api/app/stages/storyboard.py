@@ -176,6 +176,7 @@ Rules:
 - Avoid fiddly hand-and-object actions as the main motion (putting on shoes or clothes, tying laces, buttoning, pouring); AI video gets them wrong. Show the moment just before or after instead (laces already tied, she stands up), or a tight close-up of the hands and the one object.
 - Make movement believable: AI video garbles bodies in fast, chaotic action. Walking and dancing are welcome; keep them smooth and steady (a slow walk, a sway, a simple groove), with one or two people as the focus rather than crowds, and avoid flips, fights and fast spins.
 - Slots marked SING are lip-synced: exactly one character sings to camera (for "SING (female voice)" a woman, for "SING (male voice)" a man; in a duet each partner sings their own lines) in a head-and-shoulders close-up, face toward the camera, steady even light on the face, mouth fully visible with no hands, props, smoke or flames in front of it. Other slots must not show anyone singing.
+- A moving vehicle always has its driver visible at the wheel.
 - transition: how this scene starts. Use "cut" on strong beats, "crossfade" for soft moments.
 - One consistent visual_style and palette (3-5 hex colors) for the whole video.
 Reply with JSON only."""
@@ -332,6 +333,9 @@ def run(d: Path, job: dict) -> None:
     # A stated gender (brief or style) beats pitch guessing, which read a male rapper over a high mix as female.
     stated = p.get("brief", {}).get("genders") or (PRESETS[p["preset"]][2].get("genders") if p.get("preset") in PRESETS else "")
     slots = mark_singing(plan_slots(analysis, lyrics), lyrics, share, None if stated else voice)
+    # The LLM can't hear the song: with one voice throughout, say who sings, or it cast a woman for a male vocal.
+    if not stated and len(heard := {s["voice"] for s in slots if s["sing"] and s.get("voice")}) == 1:
+        job = {**job, "params": {**p, "brief": {**p.get("brief", {}), "genders": f"the lead singer is a {'man' if heard == {'male'} else 'woman'}"}}}
     # Every cast member is described from their picture, so the text matches the face the edit model copies;
     # a short library note like "sassy blonde country singer" let the LLM invent a different haircut and outfit.
     cast = [{**c, "description": describe_photo(d / "cast" / c["photo"]) + (f' ({c["appearance"]})' if c.get("appearance") else "")}

@@ -46,6 +46,7 @@ QC_QUESTIONS = {
     "extra_limbs": "does anyone have extra or missing arms, legs, feet or shoes, or limbs joined wrongly?",
     "unnatural_pose": "is anyone standing or sitting in a physically impossible or twisted pose?",
     "black_bars": "are there solid black bars along the top and bottom or the sides of the image?",
+    "big_head": "is anyone's head unnaturally large for their body?",
     "collage": "is the image split into two or more separate pictures or panels?",
 }
 
@@ -130,7 +131,7 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # Legwear in a close-up ("dark denim jeans") made the model add a full-body panel under the face.
         shot = re.sub(LEGWEAR, "", shot, flags=re.I)
         shot = (f"One single photo, no panels or insets: a head-and-shoulders close-up of {lead}, framed from the chest up, "
-                f"the face large in the frame, mouth clearly visible, facing the camera. {shot}")
+                f"head and body in natural proportion, mouth clearly visible, facing the camera. {shot}")
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
     mics = board.get("mics", "").lower()
