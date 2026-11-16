@@ -329,7 +329,9 @@ def run(d: Path, job: dict) -> None:
 
     p = job["params"]
     share = 1 if p.get("performance") else PRESETS[p["preset"]][0] if p.get("preset") in PRESETS else 1 / 3
-    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, share, voice)
+    # A stated gender (brief or style) beats pitch guessing, which read a male rapper over a high mix as female.
+    stated = p.get("brief", {}).get("genders") or (PRESETS[p["preset"]][2].get("genders") if p.get("preset") in PRESETS else "")
+    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, share, None if stated else voice)
     # Every cast member is described from their picture, so the text matches the face the edit model copies;
     # a short library note like "sassy blonde country singer" let the LLM invent a different haircut and outfit.
     cast = [{**c, "description": describe_photo(d / "cast" / c["photo"]) + (f' ({c["appearance"]})' if c.get("appearance") else "")}
