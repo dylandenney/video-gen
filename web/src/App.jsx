@@ -237,6 +237,8 @@ function Job({ id, onChange, onDeleted }) {
               <option value="">Default</option>
               <option value="90s-west-coast-rap">90s West Coast rap</option>
               <option value="90s-country">90s country</option>
+              <option value="alt-rock">Alternative rock</option>
+              <option value="alt-folk">Alternative folk</option>
             </select>
           </label>
           <label title="Stop after the images so you can check and redo them before the slow video stage"><input type="checkbox" checked={!!form.review} onChange={(e) => setForm({ ...form, review: e.target.checked })} /> Pause after images</label>

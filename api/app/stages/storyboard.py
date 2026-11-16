@@ -86,6 +86,23 @@ PRESETS = {  # video styles: lip-synced share, what to show, and brief answers i
         "a small-town main street, a front-porch swing. Slow dolly and crane moves, golden-hour light, soft warm "
         "film look with light grain.",
         {"look": "1990s country music video"}),
+    "alt-rock": (0.5, "Video style: alternative rock video. The lead singer (matching the voice heard) fronts a four-piece band "
+        "in worn thrift-store clothes (flannel, band tee, ripped jeans, boots), the same look in every shot. Performance "
+        "(SING slots): the singer sings to the camera, close and handheld, in a cramped rehearsal space, a warehouse or an "
+        "empty lot at dusk; list only the singer in a SING slot's characters (lip sync follows one face) and describe the band "
+        "as blurred figures behind. Cutaways (all other slots, each different): the drummer and guitarist playing hard, "
+        "amps and pedals close-up, a crowd jumping in a small club, the band driving at night in an old van, "
+        "empty city streets, a story from the lyrics in moody fragments. Desaturated colour with crushed blacks, grain, "
+        "harsh practical lights, occasional quick handheld whip pans.",
+        {"look": "alternative rock band video"}),
+    "alt-folk": (0.5, "Video style: alternative folk video. The lead singer (matching the voice heard) is one named character "
+        "in earthy layers (wool sweater or chore jacket, linen, boots), the same look in every shot. Performance (SING slots): "
+        "the singer sings to the camera, close and still, with an acoustic guitar or banjo, in a forest clearing, a wooden cabin "
+        "by a window, or a field at dawn; list only the singer in a SING slot's characters (lip sync follows one face). "
+        "Cutaways (all other slots, each different): hands on strings, mist over a lake, tall grass in the wind, a candle-lit "
+        "kitchen, friends sitting around a campfire, a slow walk through woods, quiet moments from the lyrics. "
+        "Natural soft light, muted earthy colours, 16mm film grain, slow steady camera.",
+        {"look": "alternative folk video"}),
 }
 
 
