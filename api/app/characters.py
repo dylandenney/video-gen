@@ -106,6 +106,11 @@ def from_job(job_dir: Path, char_id: str) -> dict:
     """Save a character from a video's storyboard, with the sheet it was drawn from."""
     board = read_json(job_dir / "storyboard.json")
     ch = next(x for x in board["characters"] if x["id"] == char_id)
+    sheet = keyframes.char_path(job_dir, char_id).read_bytes()
+    # The page forgets "saved" on reload, so a second click must not make a second copy.
+    if same := next((c for c in list_all() if (LIBRARY / c["id"] / "sheet.png").exists()
+                     and (LIBRARY / c["id"] / "sheet.png").read_bytes() == sheet), None):
+        return same
     c, d = _new(ch["name"], ch["appearance"], "photo" if "photo" in ch else "generated")
     shutil.copyfile(keyframes.char_path(job_dir, char_id), d / "sheet.png")
     return _save(c)
