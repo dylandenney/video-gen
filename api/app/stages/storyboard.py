@@ -226,7 +226,7 @@ def voice_of(vocals: np.ndarray, sr: int, s: dict) -> str:
     f0 = f0[voiced]
     if len(f0) < 20:
         return ""
-    return "female" if np.median(f0) > 165 else "male"  # between typical sung male (~100-160 Hz) and female (~180+ Hz) ranges
+    return "female" if np.median(f0) > 250 else "male"  # men often sing at 150-250 Hz; 165 read male singers as female
 
 
 def gender_of(appearance: str) -> str:
