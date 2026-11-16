@@ -1,0 +1,12 @@
+[
+  {"name": "duet-country", "from_job": "8fa842041c61", "start": 42.5, "end": 55,
+   "params": {"story": "Duet country singers performing in a field of wheat.", "performance": false}},
+  {"name": "rapper-solo", "from_job": "f1e4df2e0c7e", "start": 80.6, "end": 93,
+   "params": {"performance": true, "brief": {"performers": "1", "genders": "male", "look": "Rapper", "mics": "no microphones", "setting": "On stage", "time": "night"}}},
+  {"name": "creature-performance", "from_job": "6e4c3377ec6c", "start": null, "end": null, "cast_library": ["a08d14d810"],
+   "params": {"story": "Bix the character, is in a space ship rapping and flying and earth is visible in the distant background", "performance": true}},
+  {"name": "lora-character", "from_job": "6bef7e75a128", "start": 30, "end": 42, "cast_library": ["36067d4e52"],
+   "params": {"story": "The singer walks through a small town at sunset.", "performance": false}},
+  {"name": "story-no-cast", "from_job": "6bef7e75a128", "start": 90, "end": 102,
+   "params": {"story": "A woman drives an old pickup truck down a country road at dawn.", "performance": false}}
+]

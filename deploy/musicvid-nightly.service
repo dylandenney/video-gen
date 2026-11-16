@@ -1,0 +1,8 @@
+[Unit]
+Description=Music Video Studio nightly regression test (local models only)
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/personal-github/musicvid
+ExecStart=/usr/bin/python3 -I tools/nightly_test.py

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import angles, characters, export, jobs
-from .config import COMFY_URL, OLLAMA_MODEL, OLLAMA_URL, TRAINING_DIR, WEB_DIR, WHISPER_MODEL
+from .config import COMFY_URL, DATA_DIR, OLLAMA_MODEL, OLLAMA_URL, TRAINING_DIR, WEB_DIR, WHISPER_MODEL
 from .jobs_io import read_json, write_json
 from .adapters import comfy
 from .stages import lyrics
@@ -459,6 +459,20 @@ def training_sample(run: str, name: str):
     base = (TRAINING_DIR / run / "samples").resolve()
     path = (base / name).resolve()
     if path.parent != base or path.suffix != ".mp4" or not path.is_file() or not base.is_relative_to(TRAINING_DIR.resolve()):
+        raise HTTPException(404)
+    return FileResponse(path)
+
+
+@app.get("/api/nightly")
+def nightly_reports() -> list[str]:
+    """Nightly regression reports (tools/nightly_test.py), newest first."""
+    return sorted((p.stem for p in (DATA_DIR / "nightly").glob("*.html")), reverse=True)
+
+
+@app.get("/api/nightly/{name}")
+def nightly_report(name: str):
+    path = (DATA_DIR / "nightly" / f"{name}.html").resolve()
+    if path.parent != (DATA_DIR / "nightly").resolve() or not path.is_file():
         raise HTTPException(404)
     return FileResponse(path)
 

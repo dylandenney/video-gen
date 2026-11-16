@@ -62,6 +62,7 @@ export default function App() {
         </label>
         <button className={current === "characters" ? "active" : ""} onClick={() => setCurrent("characters")}>Characters</button>
         <button className={current === "training" ? "active" : ""} onClick={() => setCurrent("training")}>Training</button>
+        <button className={current === "tests" ? "active" : ""} onClick={() => setCurrent("tests")}>Tests</button>
         {error && <p className="error">{error}</p>}
         <ul className="jobs">
           {jobs.map((j) => (
@@ -79,7 +80,7 @@ export default function App() {
           </p>
         )}
       </aside>
-      <main>{current === "characters" ? <Characters /> : current === "training" ? <Training /> : current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
+      <main>{current === "characters" ? <Characters /> : current === "training" ? <Training /> : current === "tests" ? <Tests /> : current ? <Job id={current} onChange={refreshJobs} onDeleted={() => { setCurrent(null); refreshJobs(); }} /> : <p className="muted">Upload a song to start.</p>}</main>
     </div>
   );
 }
@@ -687,4 +688,19 @@ function Training() {
       </div>
     </section>
   ));
+}
+
+
+function Tests() {
+  const [reports, setReports] = useState(null);
+  useEffect(() => { api("/nightly").then(setReports).catch(() => setReports([])); }, []);
+  if (!reports) return <p className="muted">Loading…</p>;
+  return (
+    <section>
+      <h2>Nightly tests</h2>
+      <p className="muted">Five short sample videos made each night with local models only. Open a report to see each scene and any problem the checks could not fix.</p>
+      {reports.length ? <ul>{reports.map((r) => <li key={r}><a href={`/api/nightly/${r}`} target="_blank" rel="noreferrer">{r}</a></li>)}</ul>
+        : <p className="muted">No reports yet; the first run is tonight.</p>}
+    </section>
+  );
 }
