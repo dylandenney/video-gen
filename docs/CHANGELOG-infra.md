@@ -37,3 +37,8 @@
 ## 2026-11-16 — Nightly regression timer
 - Installed systemd user units `~/.config/systemd/user/musicvid-nightly.{service,timer}` (copies of `deploy/`), enabled; runs `tools/nightly_test.py` at 01:00 America/New_York. Remove with `systemctl --user disable --now musicvid-nightly.timer`.
 - Stopped the `vllm-coder` container (2026-11-15) to free ~59 GB unified memory; restart with `docker start vllm-coder`.
+
+## 2026-11-16 — Local coding agent (trial)
+- New container `vllm-coder-agent` (vllm/vllm-openai, Qwen3-Coder-30B-A3B-Instruct-FP8 from the existing HF cache, offline): 127.0.0.1:8100, `--gpu-memory-utilization 0.35` (~42 GB), `--max-model-len 65536`, served name `qwen3-coder`, `VLLM_NO_USAGE_STATS=1`, `DO_NOT_TRACK=1`. Old `vllm-coder` left unchanged (stopped). Stop before video jobs: `docker stop vllm-coder-agent`.
+- Node v22.23.5 linux-arm64 (sha256 verified) in `~/tools/node22`; system Node 18 untouched.
+- Qwen Code 0.27.4 in `~/tools/qwen-code` (npm --prefix); wrapper `~/tools/bin/qwen-local` points it at the local vLLM. `~/.qwen/settings.json`: openai auth, telemetry and usage statistics off.
