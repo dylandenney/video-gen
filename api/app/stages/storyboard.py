@@ -65,13 +65,13 @@ PERFORMANCE = ("Performance video: the lead singer (the first cast member if any
 
 
 PRESETS = {  # video styles: lip-synced share, what to show, and brief answers it fills in (the user's own win)
-    "90s-west-coast-rap": (0.5, "Video style: classic 1990s West Coast rap video. The lead rapper is a man, one named character "
+    "90s-west-coast-rap": (0.6, "Video style: classic 1990s West Coast rap video. The lead rapper is a man, one named character "
         "in baggy 90s clothes (oversized tee or flannel, chain, sunglasses or a bandana), the same look in every shot. "
         "Performance (SING slots): he raps to the camera beside a lowrider, low angles and fish-eye close-ups; list only him "
         "in a SING slot's characters (lip sync follows one face) and describe his crew as blurred figures behind him. "
         "Cutaways (all other slots, each different, at most every other cutaway a car): a lowrider bouncing on its hydraulics "
         "(front wheels lifting off the street), a lowrider three-wheeling, chrome wire wheels close-up, motorcycles cruising, "
-        "a backyard barbecue or block party, adult women dancing in 90s fashion (crop tops, hoop earrings, bandanas), "
+        "a backyard barbecue or block party, adult women in 90s fashion washing a lowrider with sponges and a hose, adult women dancing in 90s fashion (crop tops, hoop earrings, bandanas), "
         "the rapper and crew walking the boulevard, palm trees against a sunset. A lowrider is a 1960s Chevrolet Impala "
         "sitting very low, one glossy metallic candy-apple colour, gold wire wheels. "
         "Bright California sun, warm over-saturated colours, light film grain.",
