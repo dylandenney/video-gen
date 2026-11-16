@@ -67,7 +67,8 @@ PERFORMANCE = ("Performance video: the lead singer (the first cast member if any
 PRESETS = {  # video styles: what to show and how much of it is lip-synced performance
     "90s-west-coast-rap": (0.4, "Video style: classic 1990s West Coast rap video. Mix two kinds of shots. Performance (SING slots): "
         "the rapper (matching the voice heard; a man for a male voice) raps to the camera beside a lowrider, the crew standing behind him nodding to the beat, "
-        "low angles and fish-eye close-ups. A lowrider is a 1960s Chevrolet Impala sitting very low, one glossy metallic "
+        "low angles and fish-eye close-ups; list only the rapper in a SING slot's characters (lip sync follows one face) and "
+        "describe the crew as blurred figures in the background. A lowrider is a 1960s Chevrolet Impala sitting very low, one glossy metallic "
         "candy-apple colour, gold wire wheels. Cutaways (all other slots, each different; the first one must be a lowrider "
         "bouncing on its hydraulics, front wheels lifting off the street, never a parked car): lowriders bouncing on hydraulics, "
         "a lowrider three-wheeling, a car-club line-up on a sunny boulevard, a backyard barbecue or block party, "
