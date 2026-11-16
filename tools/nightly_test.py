@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 FIXTURES = json.loads((ROOT / "tools" / "nightly_fixtures.json").read_text())
 SECONDS = 12  # short sections keep the whole run to about an hour
-NOTE_ONLY = {"distorted_face", "extra_limbs", "twisted_body", "unnatural_pose", "human_face"}  # keep in step with keyframes.py
+NOTE_ONLY = {"distorted_face", "extra_limbs", "twisted_body", "unnatural_pose", "human_face", "garbled_text"}  # keep in step with keyframes.py
 
 
 def call(path: str, body=None, method: str | None = None, headers: dict | None = None):
