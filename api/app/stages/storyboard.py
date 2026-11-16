@@ -64,16 +64,18 @@ PERFORMANCE = ("Performance video: the lead singer (the first cast member if any
                "or a quiet detail of the setting. No other people unless the story idea asks for them; a story idea colors the setting and mood.")
 
 
-PRESETS = {  # video styles: what to show and how much of it is lip-synced performance
-    "90s-west-coast-rap": (0.4, "Video style: classic 1990s West Coast rap video. Mix two kinds of shots. Performance (SING slots): "
-        "the rapper (matching the voice heard; a man for a male voice) raps to the camera beside a lowrider, the crew standing behind him nodding to the beat, "
-        "low angles and fish-eye close-ups; list only the rapper in a SING slot's characters (lip sync follows one face) and "
-        "describe the crew as blurred figures in the background. A lowrider is a 1960s Chevrolet Impala sitting very low, one glossy metallic "
-        "candy-apple colour, gold wire wheels. Cutaways (all other slots, each different; the first one must be a lowrider "
-        "bouncing on its hydraulics, front wheels lifting off the street, never a parked car): lowriders bouncing on hydraulics, "
-        "a lowrider three-wheeling, a car-club line-up on a sunny boulevard, a backyard barbecue or block party, "
-        "adult women dancing in 90s fashion (crop tops, hoop earrings, bandanas), palm trees against a sunset, "
-        "chrome wire wheels close-up. Bright California sun, warm over-saturated colours, light film grain."),
+PRESETS = {  # video styles: lip-synced share, what to show, and brief answers it fills in (the user's own win)
+    "90s-west-coast-rap": (0.5, "Video style: classic 1990s West Coast rap video. The lead rapper is a man, one named character "
+        "in baggy 90s clothes (oversized tee or flannel, chain, sunglasses or a bandana), the same look in every shot. "
+        "Performance (SING slots): he raps to the camera beside a lowrider, low angles and fish-eye close-ups; list only him "
+        "in a SING slot's characters (lip sync follows one face) and describe his crew as blurred figures behind him. "
+        "Cutaways (all other slots, each different, at most every other cutaway a car): a lowrider bouncing on its hydraulics "
+        "(front wheels lifting off the street), a lowrider three-wheeling, chrome wire wheels close-up, motorcycles cruising, "
+        "a backyard barbecue or block party, adult women dancing in 90s fashion (crop tops, hoop earrings, bandanas), "
+        "the rapper and crew walking the boulevard, palm trees against a sunset. A lowrider is a 1960s Chevrolet Impala "
+        "sitting very low, one glossy metallic candy-apple colour, gold wire wheels. "
+        "Bright California sun, warm over-saturated colours, light film grain.",
+        {"genders": "the lead rapper is a man", "look": "1990s West Coast rap"}),
 }
 
 
@@ -237,7 +239,7 @@ def build_prompt(job: dict, analysis: dict, lyrics: dict, slots: list[dict], cas
         f'Clip length {analysis["duration"]:.1f}s, tempo {analysis["tempo"]} BPM.',
         *([PERFORMANCE] if p.get('performance') else []),
         *([PRESETS[p["preset"]][1]] if p.get("preset") in PRESETS else []),
-        *brief_lines(p),
+        *brief_lines({**p, "brief": {**(PRESETS[p["preset"]][2] if p.get("preset") in PRESETS else {}), **p.get("brief", {})}}),
         f'Frame: {SHAPES[p.get("aspect", "9:16")]}.',
         "",
         "Full song lyrics (the story and genre come from these; a first line may list the genre):" if full
