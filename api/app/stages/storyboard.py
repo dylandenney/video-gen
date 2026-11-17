@@ -106,7 +106,7 @@ PRESETS = {  # video styles: lip-synced share, what to show, and brief answers i
 }
 
 
-def mark_singing(slots: list[dict], lyrics: dict, share: float = 1 / 3, voice=None) -> list[dict]:
+def mark_singing(slots: list[dict], lyrics: dict, share: float = 1 / 3, voice=None, duet: bool = False) -> list[dict]:
     """Mark the slots with the most singing (up to `share` of them; 1 in performance mode) to be lip-synced.
 
     Decided here rather than by the LLM, which flagged too few or none. `voice(slot)` names the voice heard;
@@ -119,10 +119,10 @@ def mark_singing(slots: list[dict], lyrics: dict, share: float = 1 / 3, voice=No
         for s in ranked:
             s["voice"] = voice(s)
         # A solo singer's high notes read as the other voice in a slot or two, which cast a second singer
-        # for a male-only song. Only treat it as a duet when each voice holds at least a third of the singing.
+        # for a male-only song. Duets are only ever set by the user; otherwise one voice sings throughout.
         heard = [s["voice"] for s in ranked if s["voice"]]
         main = max(set(heard), key=heard.count) if heard else ""
-        if heard and heard.count(main) > len(heard) * 2 / 3:
+        if not duet:
             for s in ranked:
                 s["voice"] = s["voice"] and main
     best = ranked[:max(1, round(len(slots) * share))]
@@ -340,7 +340,9 @@ def run(d: Path, job: dict) -> None:
     share = 1 if p.get("performance") else PRESETS[p["preset"]][0] if p.get("preset") in PRESETS else 1 / 3
     # A stated gender (brief or style) beats pitch guessing, which read a male rapper over a high mix as female.
     stated = p.get("brief", {}).get("genders") or (PRESETS[p["preset"]][2].get("genders") if p.get("preset") in PRESETS else "")
-    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, share, None if stated else voice)
+    brief = p.get("brief", {})
+    duet = brief.get("performers", "").startswith("2") or brief.get("genders") == "one female and one male"
+    slots = mark_singing(plan_slots(analysis, lyrics), lyrics, share, voice if duet or not stated else None, duet)
     # The LLM can't hear the song: with one voice throughout, say who sings, or it cast a woman for a male vocal.
     if not stated and len(heard := {s["voice"] for s in slots if s["sing"] and s.get("voice")}) == 1:
         job = {**job, "params": {**p, "brief": {**p.get("brief", {}), "genders": f"the lead singer is a {'man' if heard == {'male'} else 'woman'}"}}}
