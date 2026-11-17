@@ -23,6 +23,7 @@ QC flags can be false. `garbled_text` and `wrong_clothes` on out-of-frame garmen
 
 ## Prompt rules
 - Use natural framing and proportions. Never write "large face" or similar exaggeration.
+- Never say "close-up" about a person, because it inflates the head. Say "chest-up shot" instead.
 - Describe what you want positively; image models ignore or invert "no".
 - Prompts live in:
   - `api/app/stages/storyboard.py`: `PRESETS`, storyboard rules, `mark_singing`
