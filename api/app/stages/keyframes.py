@@ -125,15 +125,15 @@ def render_scene(d: Path, board: dict, s: dict) -> None:
         # Name the character: "the singer" (made "the musician" below) drew an extra human beside non-human leads.
         lead = next((c["name"] for c in board["characters"] if refs and c["id"] == refs[0]), "the singer")
         # A storyboard "medium shot" next to this close-up made the model draw the character twice, once at each size.
-        shot = re.sub(r"\b(extreme |very )?(wide|medium|long|full[- ]body|establishing|low-angle|high-angle) (shot|view)\b", "chest-up shot", shot, flags=re.I)
-        # Any "close-up" wording inflated the head, so singing shots are described as chest-up instead.
-        shot = re.sub(r"\b(extreme |tight |head-and-shoulders )?close-?up\b", "chest-up shot", shot, flags=re.I)
+        shot = re.sub(r"\b(extreme |very )?(wide|medium|long|full[- ]body|establishing|low-angle|high-angle) (shot|view)\b", "waist-up shot", shot, flags=re.I)
+        # Any "close-up" wording inflated the head, so singing shots are described as waist-up instead.
+        shot = re.sub(r"\b(extreme |tight |head-and-shoulders )?close-?up\b", "waist-up shot", shot, flags=re.I)
         shot = re.sub(r"[^.]*\b(lower|higher|small) in the frame\b[^.]*\.", "", shot, flags=re.I)
         # "close-up looking up at the alien" drew a second, human onlooker doing the looking.
         shot = re.sub(r"\b(looking|gazing|peering) (up|down) at\b", "of", shot, flags=re.I)
         # Legwear in a close-up ("dark denim jeans") made the model add a full-body panel under the face.
         shot = re.sub(LEGWEAR, "", shot, flags=re.I)
-        shot = (f"One single photo, no panels or insets: a chest-up shot of {lead}, framed from mid-chest to just above the head, "
+        shot = (f"One single photo, no panels or insets: a waist-up shot of {lead}, framed from the waist to just above the head, "
                 f"head and body in natural proportion, mouth clearly visible, facing the camera. {shot}")
         extra["face_too_small"] = ("is the main person's face shorter than a quarter of the image height, "
                                    "or is their mouth covered or turned away from the camera?")
