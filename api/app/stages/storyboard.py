@@ -118,6 +118,13 @@ def mark_singing(slots: list[dict], lyrics: dict, share: float = 1 / 3, voice=No
     if ranked and voice:
         for s in ranked:
             s["voice"] = voice(s)
+        # A solo singer's high notes read as the other voice in a slot or two, which cast a second singer
+        # for a male-only song. Only treat it as a duet when each voice holds at least a third of the singing.
+        heard = [s["voice"] for s in ranked if s["voice"]]
+        main = max(set(heard), key=heard.count) if heard else ""
+        if heard and heard.count(main) > len(heard) * 2 / 3:
+            for s in ranked:
+                s["voice"] = s["voice"] and main
     best = ranked[:max(1, round(len(slots) * share))]
     for v in {s.get("voice") for s in ranked} - {s.get("voice") for s in best} - {None, ""}:
         best.append(next(s for s in ranked if s.get("voice") == v))
